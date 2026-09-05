@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "parade-state",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    // Set to "true" only on a demo or staging deployment. Enables the demo clock,
+    // simulated offline controls and one-tap demo sign-in.
+    "DEMO_CONTROLS": "false"
+  },
+  // Secrets (set with `wrangler secret put` or in the Cloudflare dashboard):
+  //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
+  //   SUPABASE_DB_URL (transaction-mode pooler, port 6543),
+  //   SUPABASE_JWT_SECRET (only for legacy projects using a shared HS256 secret),
+  //   BOOTSTRAP_ADMIN_PASSWORD (one-time, creates the first S1 admin)
+  //
+  // Recommended: create a Hyperdrive config from the transaction-mode pooler URL and
+  // uncomment this binding. The Worker falls back to SUPABASE_DB_URL without it.
+  // "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<hyperdrive-id>" }],
+  "triggers": {
+    // 10:05 and 14:05 Singapore time: mark unsubmitted units Late and keep Supabase awake.
+    "crons": ["5 2 * * *", "5 6 * * *"]
+  },
+  "observability": { "enabled": true }
+}

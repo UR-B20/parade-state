@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["./worker-configuration.d.ts", "node"]
+  },
+  "include": ["src/worker", "src/shared", "src/test", "seed", "scripts", "drizzle.config.ts", "vitest.config.ts", "playwright.config.ts"]
+}

@@ -1,0 +1,64 @@
+{
+  "name": "parade-state",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Parade State: battalion attendance reporting for unit commanders and S1.",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "VITE_MOCK_API=1 vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "types": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "seed:demo": "tsx seed/seed-demo.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@hono/valibot-validator": "0.6.1",
+    "@supabase/supabase-js": "2.115.0",
+    "@tanstack/query-async-storage-persister": "5.102.8",
+    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-query-persist-client": "5.102.8",
+    "drizzle-orm": "0.45.2",
+    "fflate": "0.8.3",
+    "hono": "4.13.7",
+    "idb-keyval": "6.3.0",
+    "jose": "6.2.12",
+    "postgres": "3.4.9",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-router-dom": "7.18.3",
+    "valibot": "1.4.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.54.4",
+    "@cloudflare/workers-types": "5.20260905.1",
+    "@electric-sql/pglite": "0.5.8",
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "5.2.0",
+    "drizzle-kit": "0.31.10",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11",
+    "wrangler": "4.129.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "@electric-sql/pglite"
+    ]
+  }
+}
