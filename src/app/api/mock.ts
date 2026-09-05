@@ -364,7 +364,7 @@ export class MockApi implements ApiClient {
       const abs = await this.absentees(eventId);
       const lines = [['Unit', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark'].join(',')];
       for (const g of abs.groups) for (const i of g.items) lines.push([i.unitName, i.rank, i.name, i.status, i.subType ?? '', i.startDate ?? '', i.endDate ?? '', JSON.stringify(i.remark ?? '')].join(','));
-      return new Blob([`﻿${lines.join('\r\n')}`], { type: format === 'csv' ? 'text/csv' : 'application/octet-stream' });
+      return new Blob([`\uFEFF${lines.join('\r\n')}`], { type: format === 'csv' ? 'text/csv' : 'application/octet-stream' });
     });
   }
 
