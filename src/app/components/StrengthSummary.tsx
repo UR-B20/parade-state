@@ -1,0 +1,82 @@
+import type { ReactNode } from 'react';
+import { STATUS_LABEL, STATUSES, type Status } from '@shared/statuses';
+import type { UnitCounts } from '@shared/types';
+import './StrengthSummary.css';
+
+interface StrengthSummaryProps {
+  counts: UnitCounts;
+  /** Reporting label (submission pill) shown top-right. */
+  report?: ReactNode;
+  /** 'Cut-off 10:00' or 'Cut-off 10:00 passed'. */
+  cutoff?: { time: string; passed: boolean };
+  /** Optional caption under the legend. */
+  note?: ReactNode;
+}
+
+function countFor(counts: UnitCounts, status: Status): number {
+  switch (status) {
+    case 'PRESENT': return counts.present;
+    case 'MC': return counts.mc;
+    case 'LL': return counts.ll;
+    case 'MA': return counts.ma;
+    case 'RSI': return counts.rsi;
+    case 'OTHERS': return counts.others;
+  }
+}
+
+export function StatusBand({ counts, label }: { counts: UnitCounts; label: string }) {
+  const parts = STATUSES.map((s) => ({ status: s, n: countFor(counts, s) })).filter((p) => p.n > 0);
+  const text = parts.map((p) => `${STATUS_LABEL[p.status]} ${p.n}`).join(', ');
+  return (
+    <div className="band" role="img" aria-label={`${label}: ${text}`}>
+      {parts.map((p) => (
+        <span key={p.status} className={`band__seg band__seg--${p.status}`} style={{ ['--n' as string]: p.n }} />
+      ))}
+    </div>
+  );
+}
+
+export function StatusLegend({ counts, showZero = false }: { counts: UnitCounts; showZero?: boolean }) {
+  return (
+    <ul className="legend" aria-label="Attendance by status">
+      {STATUSES.map((s) => {
+        const n = countFor(counts, s);
+        if (n === 0 && !showZero) return null;
+        return (
+          <li key={s} className={`legend__item band__seg--${s}`}>
+            <span className="legend__swatch" aria-hidden="true" />
+            <span>{STATUS_LABEL[s]}</span>
+            <span className="legend__count num">{n}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function StrengthSummary({ counts, report, cutoff, note }: StrengthSummaryProps) {
+  return (
+    <section className="strength" aria-labelledby="strength-label">
+      <div className="strength__top">
+        <div>
+          <div id="strength-label" className="strength__label">Present strength</div>
+          <div className="strength__figure num">
+            <span className="strength__present">{counts.present}</span>
+            <span className="strength__total">/ {counts.strength}</span>
+          </div>
+        </div>
+        <div className="strength__report">
+          {report}
+          {cutoff && (
+            <span className={`strength__cutoff num${cutoff.passed ? ' strength__cutoff--passed' : ''}`}>
+              Cut-off {cutoff.time}{cutoff.passed ? ' passed' : ''}
+            </span>
+          )}
+        </div>
+      </div>
+      <StatusBand counts={counts} label="Attendance" />
+      <StatusLegend counts={counts} />
+      {note && <p className="strength__note">{note}</p>}
+    </section>
+  );
+}

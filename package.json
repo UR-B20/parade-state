@@ -16,7 +16,8 @@
     "seed:demo": "tsx seed/seed-demo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:standalone": "vite build --config vite.standalone.config.ts"
   },
   "dependencies": {
     "@hono/valibot-validator": "0.6.1",

@@ -1,0 +1,43 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--pill-bg, var(--others-tint));
+  color: var(--pill-fg, var(--others));
+  border: 1px solid transparent;
+}
+
+.pill--PRESENT { --pill-bg: var(--present-tint); --pill-fg: var(--present); }
+.pill--MC { --pill-bg: var(--mc-tint); --pill-fg: var(--mc); }
+.pill--LL { --pill-bg: var(--ll-tint); --pill-fg: var(--ll); }
+.pill--MA { --pill-bg: var(--ma-tint); --pill-fg: var(--ma); }
+.pill--RSI { --pill-bg: var(--rsi-tint); --pill-fg: var(--rsi); }
+.pill--OTHERS { --pill-bg: var(--others-tint); --pill-fg: var(--others); }
+
+/* Default attendance: unmarked people count as Present but are not confirmed. */
+.pill--default {
+  --pill-bg: transparent;
+  --pill-fg: var(--default-present);
+  border-color: var(--line-strong);
+  border-style: dashed;
+}
+
+.pill--ok { --pill-bg: var(--ok-tint); --pill-fg: var(--ok); }
+.pill--warn { --pill-bg: var(--warn-tint); --pill-fg: var(--warn); }
+.pill--danger { --pill-bg: var(--danger-tint); --pill-fg: var(--danger); }
+.pill--pending { --pill-bg: var(--pending-tint); --pill-fg: var(--pending); }
+.pill--neutral { --pill-bg: transparent; --pill-fg: var(--text-2); border-color: var(--line-strong); }
+
+.pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
