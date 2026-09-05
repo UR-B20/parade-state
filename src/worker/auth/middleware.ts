@@ -56,8 +56,11 @@ export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-/** Commanders may only touch their own unit; admins may read any unit. */
-export function requireUnitAccess(mode: 'read' | 'write') {
+/**
+ * Commanders may only touch their own unit. Admins may read any unit and manage any roll,
+ * but marking attendance ('write') is the commander's alone.
+ */
+export function requireUnitAccess(mode: 'read' | 'manage' | 'write') {
   return createMiddleware<AppEnv>(async (c, next) => {
     const user = c.get('user');
     const unitId = c.req.param('unitId');

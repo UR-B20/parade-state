@@ -7,6 +7,10 @@ import { defaultDeps, type AppDeps } from './deps';
 import { withDb, type AppEnv } from './auth/middleware';
 import { authRoutes } from './routes/auth';
 import { adminUserRoutes } from './routes/adminUsers';
+import { adminSettingsRoutes } from './routes/adminSettings';
+import { eventRoutes, unitRoutes } from './routes/events';
+import { rollRoutes } from './routes/roll';
+import { attendanceRoutes } from './routes/attendance';
 import { profileCount } from './services/users';
 
 export type { AppEnv };
@@ -34,7 +38,12 @@ export function createApp(deps: AppDeps = defaultDeps) {
   });
 
   app.route('/auth', authRoutes);
+  app.route('/events', eventRoutes);
+  app.route('/units', unitRoutes);
+  app.route('/units/:unitId/personnel', rollRoutes);
+  app.route('/units/:unitId/attendance', attendanceRoutes);
   app.route('/admin/users', adminUserRoutes);
+  app.route('/admin', adminSettingsRoutes);
 
   return app;
 }
