@@ -1,6 +1,6 @@
 import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify, type JWTPayload } from 'jose';
 import type { Bindings } from '../env';
-import { unauthorized } from '../errors';
+import { ConfigError, unauthorized } from '../errors';
 
 export interface VerifiedToken {
   sub: string;
@@ -14,7 +14,7 @@ const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
  * JWKS endpoint; legacy projects use a shared HS256 secret (SUPABASE_JWT_SECRET).
  */
 export async function verifySupabaseToken(token: string, env: Pick<Bindings, 'SUPABASE_URL' | 'SUPABASE_JWT_SECRET'>): Promise<VerifiedToken> {
-  if (!env.SUPABASE_URL) throw new Error('SUPABASE_URL is not configured');
+  if (!env.SUPABASE_URL) throw new ConfigError('set the SUPABASE_URL secret');
   const issuer = `${env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1`;
   let payload: JWTPayload;
   try {

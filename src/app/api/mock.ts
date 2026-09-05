@@ -14,7 +14,7 @@ import {
   MarkValidationError, planMark, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
-import { ApiError, type ApiClient, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
+import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
 
 const LATENCY_MS = 220;
 const ADMIN_EMAIL = 's1admin@parade-state.demo';
@@ -158,6 +158,23 @@ export class MockApi implements ApiClient {
       { email: DEFAULT_EMAIL, label: 'Coy 1 commander', role: 'COMMANDER' },
       { email: ADMIN_EMAIL, label: 'S1 admin', role: 'ADMIN' },
     ]);
+  }
+
+  bootstrap(body: BootstrapBody): Promise<UserDto> {
+    return this.wait(() => {
+      const u = { id: this.newId('u'), email: body.email.toLowerCase(), displayName: body.displayName, role: 'ADMIN' as const, unitId: null };
+      this.data.users.push(u);
+      this.currentEmail = u.email;
+      return { ...u, mustChangePassword: false, isActive: true, createdAt: this.nowIso() };
+    });
+  }
+
+  changePassword(): Promise<void> {
+    return this.wait(() => undefined);
+  }
+
+  subscribeAdminChanges(): () => void {
+    return () => undefined;
   }
 
   me(): Promise<MeDto> {

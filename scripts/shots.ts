@@ -68,6 +68,17 @@ await page.getByRole('searchbox').fill('zzzz');
 await shot(page, '10-mark-empty-search');
 await page.getByRole('button', { name: 'Clear search' }).click();
 
+// Roll management
+await page.getByRole('link', { name: 'Manage roll' }).click();
+await page.getByRole('button', { name: /Edit CPL Daniel Tan/ }).waitFor({ timeout: 20_000 });
+await shot(page, '12-roll');
+await page.getByRole('button', { name: 'Add person' }).first().click();
+await page.locator('dialog[open]').waitFor();
+await shot(page, '13-roll-add');
+await page.getByRole('button', { name: 'Add to roll' }).click();
+await shot(page, '14-roll-add-validation');
+await page.getByRole('button', { name: 'Close' }).click();
+
 // Wide viewport (same session)
 const wide = await ctx.newPage();
 await wide.setViewportSize({ width: 1280, height: 900 });
@@ -110,6 +121,21 @@ await admin.waitForTimeout(800);
 await admin.getByRole('button', { name: 'Close' }).first().click();
 await admin.getByText('Late').first().waitFor();
 await shot(admin, '26-admin-late');
+// Accounts + settings
+await admin.getByRole('button', { name: 'Account menu' }).click();
+await admin.getByRole('link', { name: 'Manage accounts' }).click();
+await admin.getByRole('heading', { name: 'Accounts' }).waitFor();
+await admin.getByText('S1 admin', { exact: true }).first().waitFor();
+await shot(admin, '28-admin-users');
+await admin.getByRole('button', { name: 'Create account' }).click();
+await admin.locator('dialog[open]').waitFor();
+await shot(admin, '29-admin-user-create');
+await admin.getByRole('button', { name: 'Close' }).click();
+await admin.getByRole('button', { name: 'Account menu' }).click();
+await admin.getByRole('link', { name: 'Cut-offs and date unlocks' }).click();
+await admin.getByRole('heading', { name: 'Cut-offs and unlocks' }).waitFor();
+await admin.getByText('Submission cut-offs').waitFor();
+await shot(admin, '30-admin-settings');
 // Wide admin
 const awide = await actx.newPage();
 await awide.setViewportSize({ width: 1280, height: 900 });

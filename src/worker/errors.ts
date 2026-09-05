@@ -40,9 +40,22 @@ export const unauthorized = (message = 'Sign in to continue') => new AppError('U
 export const validation = (message: string, details?: unknown) => new AppError('VALIDATION', message, details);
 export const conflict = (message: string) => new AppError('CONFLICT', message);
 
+/** Missing secrets or bindings. Surfaced plainly so a first deployment is easy to fix. */
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
 export function handleError(err: unknown, c: Context): Response {
   if (err instanceof AppError) {
     return c.json(err.toBody(), err.status);
+  }
+  if (err instanceof ConfigError) {
+    console.error('Configuration error', err.message);
+    const body: ApiErrorBody = { error: { code: 'INTERNAL', message: `Server configuration incomplete: ${err.message}` } };
+    return c.json(body, 503);
   }
   console.error('Unhandled error', err);
   const body: ApiErrorBody = {

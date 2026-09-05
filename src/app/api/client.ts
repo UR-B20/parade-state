@@ -11,6 +11,7 @@ export interface UpdateUserBody { displayName?: string; unitId?: string | null; 
 export interface CreateAdhocBody { date: IsoDate; name: string; cutoffTime: string }
 
 export interface DemoAccount { email: string; label: string; role: 'ADMIN' | 'COMMANDER' }
+export interface BootstrapBody { email: string; displayName: string; password: string; setupKey: string }
 
 /** Everything the UI needs from the server. Implemented by the HTTP client and the demo mock. */
 export interface ApiClient {
@@ -18,7 +19,12 @@ export interface ApiClient {
   signOut(): Promise<void>;
   /** One-tap demo accounts; empty unless demo controls are enabled. */
   demoAccounts(): Promise<DemoAccount[]>;
+  /** Creates the first S1 admin while no accounts exist. */
+  bootstrap(body: BootstrapBody): Promise<UserDto>;
+  changePassword(newPassword: string): Promise<void>;
   me(): Promise<MeDto>;
+  /** Live refresh hook for the S1 dashboard. Returns an unsubscribe function. */
+  subscribeAdminChanges(onChange: () => void): () => void;
   units(): Promise<UnitDto[]>;
   events(date: IsoDate): Promise<EventDto[]>;
   createAdhocEvent(body: CreateAdhocBody): Promise<EventDto>;

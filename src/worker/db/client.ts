@@ -3,6 +3,7 @@ import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import type { Bindings } from '../env';
+import { ConfigError } from '../errors';
 import * as schema from './schema';
 
 export { schema };
@@ -23,7 +24,7 @@ export interface DbHandle {
  */
 export function connectDb(env: Bindings): DbHandle {
   const url = env.HYPERDRIVE?.connectionString ?? env.SUPABASE_DB_URL;
-  if (!url) throw new Error('Database is not configured: set SUPABASE_DB_URL or bind HYPERDRIVE');
+  if (!url) throw new ConfigError('set the SUPABASE_DB_URL secret or bind HYPERDRIVE');
   const sql = postgres(url, { prepare: false, max: 1, fetch_types: false, idle_timeout: 10, connect_timeout: 10 });
   const db = drizzle(sql, { schema, casing: 'snake_case' });
   return { db, close: () => sql.end({ timeout: 2 }) };

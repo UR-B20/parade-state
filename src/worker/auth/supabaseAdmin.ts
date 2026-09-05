@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Bindings } from '../env';
+import { ConfigError } from '../errors';
 
 /** The slice of Supabase Auth's admin API the Worker needs. Faked in tests. */
 export interface AuthAdmin {
@@ -10,7 +11,7 @@ export interface AuthAdmin {
 }
 
 export function createSupabaseAuthAdmin(env: Pick<Bindings, 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY'>): AuthAdmin {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase service role is not configured');
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new ConfigError('set the SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY secrets');
   const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });

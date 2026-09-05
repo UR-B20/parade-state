@@ -4,6 +4,13 @@ import { formatSgDateLong, formatSgTime, sgDateOf, type IsoDate } from '@shared/
 import { awaitingRank, isSubmitted } from '@shared/domain';
 import type { UnitSummaryRow } from '@shared/types';
 import { useAbsentees, useEvents, useNotifications, useSummary } from '../../api/queries';
+import { useApi } from '../../api/provider';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as v from 'valibot';
+import { CreateAdhocEventSchema, firstIssue } from '@shared/schemas';
+import { Sheet } from '../../components/Sheet';
+import { useToast } from '../../components/Toast';
+import { keys } from '../../api/keys';
 import { useAuth } from '../../state/auth';
 import { AbsenteeList } from '../../components/AbsenteeList';
 import { AccountButton, AccountMenu } from '../../components/AccountMenu';
@@ -71,6 +78,18 @@ export function DashboardPage() {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [adhocOpen, setAdhocOpen] = useState(false);
+  const api = useApi();
+  const qc = useQueryClient();
+
+  // Live refresh: Supabase Realtime tells us when any unit submits or marks.
+  useEffect(() => {
+    return api.subscribeAdminChanges(() => {
+      void qc.invalidateQueries({ queryKey: ['summary'] });
+      void qc.invalidateQueries({ queryKey: ['absentees'] });
+      void qc.invalidateQueries({ queryKey: keys.notifications });
+    });
+  }, [api, qc]);
 
   const groups = useMemo(() => {
     if (!summary) return { awaiting: [] as UnitSummaryRow[], submitted: [] as UnitSummaryRow[] };
@@ -102,6 +121,7 @@ export function DashboardPage() {
           selectedId={eventId}
           onSelect={(id) => setParam('event', id)}
           onDateChange={(d) => setParams((p) => { const next = new URLSearchParams(p); next.set('date', d); next.delete('event'); return next; })}
+          onCreateAdhoc={() => setAdhocOpen(true)}
         />
       </AppHeader>
       <ConnectionBanner />
@@ -200,6 +220,41 @@ export function DashboardPage() {
 
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} data={notifQ.data} today={today} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AdhocSheet open={adhocOpen} date={date} onClose={() => setAdhocOpen(false)} onCreated={(id) => { setAdhocOpen(false); setParam('event', id); }} />
     </div>
+  );
+}
+
+function AdhocSheet({ open, date, onClose, onCreated }: { open: boolean; date: IsoDate; onClose: () => void; onCreated: (eventId: string) => void }) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [name, setName] = useState('');
+  const [cutoffTime, setCutoffTime] = useState('12:00');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const create = useMutation({
+    mutationFn: (body: { date: IsoDate; name: string; cutoffTime: string }) => api.createAdhocEvent(body),
+    onSuccess: (ev) => { void qc.invalidateQueries({ queryKey: ['events', date] }); toast.show(`${ev.label} created`); setName(''); onCreated(ev.id); },
+    onError: (err) => toast.show(err instanceof ApiError ? err.message : "Couldn't create the event.", { tone: 'error' }),
+  });
+  const submit = () => {
+    const parsed = v.safeParse(CreateAdhocEventSchema, { date, name, cutoffTime });
+    if (!parsed.success) return setErrors(firstIssue(parsed.issues));
+    setErrors({});
+    create.mutate(parsed.output);
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Ad hoc event" subtitle={`On ${formatSgDateLong(date)}. All units report for it.`} footer={<Button variant="primary" block busy={create.isPending} onClick={submit}>Create event</Button>}>
+      <label className="field">
+        <span className="field__label">Event name</span>
+        <input className="field__input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Route march" aria-invalid={!!errors['name'] || undefined} />
+        {errors['name'] && <span className="field__error" role="alert">{errors['name']}</span>}
+      </label>
+      <label className="field">
+        <span className="field__label">Submission cut-off</span>
+        <input className="field__input num" type="time" value={cutoffTime} onChange={(e) => setCutoffTime(e.target.value)} aria-invalid={!!errors['cutoffTime'] || undefined} />
+        {errors['cutoffTime'] && <span className="field__error" role="alert">{errors['cutoffTime']}</span>}
+      </label>
+    </Sheet>
   );
 }

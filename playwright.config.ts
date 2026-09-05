@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 
 const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:4173';
 
@@ -9,15 +9,18 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL,
-    ...devices['iPhone 14'],
+    browserName: 'chromium',
     viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
+    locale: 'en-SG',
+    timezoneId: 'Asia/Singapore',
   },
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'pnpm build && pnpm preview --port 4173',
+        command: 'pnpm dev:mock --port 4173 --strictPort',
         url: baseURL,
         reuseExistingServer: true,
         timeout: 180_000,
