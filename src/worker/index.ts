@@ -11,6 +11,9 @@ import { adminSettingsRoutes } from './routes/adminSettings';
 import { eventRoutes, unitRoutes } from './routes/events';
 import { rollRoutes } from './routes/roll';
 import { attendanceRoutes } from './routes/attendance';
+import { submissionRoutes } from './routes/submissions';
+import { notificationRoutes } from './routes/notifications';
+import { runScheduled } from './scheduled';
 import { profileCount } from './services/users';
 
 export type { AppEnv };
@@ -42,6 +45,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
   app.route('/units', unitRoutes);
   app.route('/units/:unitId/personnel', rollRoutes);
   app.route('/units/:unitId/attendance', attendanceRoutes);
+  app.route('/units/:unitId/submissions', submissionRoutes);
+  app.route('/notifications', notificationRoutes);
   app.route('/admin/users', adminUserRoutes);
   app.route('/admin', adminSettingsRoutes);
 
@@ -52,7 +57,7 @@ const app = createApp();
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller: ScheduledController, _env: Bindings, _ctx: ExecutionContext) {
-    // Late notifications + Supabase keep-alive are wired in a later milestone.
+  async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduled(env, defaultDeps).then((r) => console.log('scheduled run', JSON.stringify(r))));
   },
 } satisfies ExportedHandler<Bindings>;
