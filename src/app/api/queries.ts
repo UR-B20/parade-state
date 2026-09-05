@@ -5,7 +5,12 @@ import { useApi } from './provider';
 
 export function useMe() {
   const api = useApi();
-  return useQuery({ queryKey: keys.me, queryFn: () => api.me(), staleTime: 60_000 });
+  return useQuery({ queryKey: keys.me, queryFn: () => api.me(), staleTime: 60_000, retry: false });
+}
+
+export function useDemoAccounts() {
+  const api = useApi();
+  return useQuery({ queryKey: ['demo-accounts'], queryFn: () => api.demoAccounts(), staleTime: Infinity, retry: false });
 }
 
 export function useUnits() {

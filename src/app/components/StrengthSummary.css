@@ -8,11 +8,17 @@
   gap: 12px;
 }
 
-.strength__top {
+.strength__row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 28px;
+}
+
+.strength__row--figure {
+  align-items: baseline;
+  margin-top: -6px;
 }
 
 .strength__label {
@@ -25,7 +31,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin-top: 2px;
+  white-space: nowrap;
 }
 
 .strength__present {
@@ -39,14 +45,6 @@
   font-size: var(--fs-denominator);
   font-weight: 500;
   color: var(--text-2);
-}
-
-.strength__report {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  text-align: right;
 }
 
 .strength__cutoff {

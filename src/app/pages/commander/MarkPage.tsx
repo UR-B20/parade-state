@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AccountButton, AccountMenu } from '../../components/AccountMenu';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutationState } from '@tanstack/react-query';
 import { formatSgDateLong, formatSgTime, sgDateOf, type IsoDate } from '@shared/dates';
@@ -70,6 +71,8 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<RollFilter>('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const readOnly = me.user.role === 'ADMIN' || !!data?.locked;
 
   useEffect(() => {
     setSelectedId(null);
@@ -144,10 +147,20 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
         title={data?.unit.name ?? ' '}
         meta={formatSgDateLong(date)}
         actions={
-          <Link to="/roll" className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}>
-            <Icon name="roll" size={18} />
-            Manage roll
-          </Link>
+          <>
+            {me.user.role === 'ADMIN' ? (
+              <Link to={`/admin?date=${date}${eventId ? `&event=${eventId}` : ''}`} className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}>
+                <Icon name="chevronLeft" size={18} />
+                Battalion
+              </Link>
+            ) : (
+              <Link to="/roll" className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}>
+                <Icon name="roll" size={18} />
+                Manage roll
+              </Link>
+            )}
+            <AccountButton onClick={() => setAccountOpen(true)} />
+          </>
         }
       >
         <EventPicker
@@ -167,7 +180,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
       </AppHeader>
 
       <ConnectionBanner />
-      {data?.locked && <LockedDateNotice date={formatSgDateLong(date)} />}
+      {data?.locked && me.user.role !== 'ADMIN' && <LockedDateNotice date={formatSgDateLong(date)} />}
 
       <main className="page__content">
         {data ? (
@@ -210,13 +223,13 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
         ) : (
           <ul className="roll" aria-label={`Personnel, ${filtered.length} shown`}>
             {filtered.map((p) => (
-              <PersonRow key={p.personId} person={p} eventDate={date} pending={pendingIds.has(p.personId)} disabled={data?.locked} onOpen={(person: EffectiveStatus) => setSelectedId(person.personId)} />
+              <PersonRow key={p.personId} person={p} eventDate={date} pending={pendingIds.has(p.personId)} disabled={readOnly} onOpen={(person: EffectiveStatus) => setSelectedId(person.personId)} />
             ))}
           </ul>
         )}
       </main>
 
-      {data && (
+      {data && me.user.role !== 'ADMIN' && (
         <SubmitFooter
           submission={data.submission}
           counts={data.counts}
@@ -229,7 +242,8 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
         />
       )}
 
-      <StatusSheet person={data?.locked ? null : selected} eventDate={date} eventLabel={event?.label ?? 'this event'} onSave={onSave} onClose={() => setSelectedId(null)} />
+      <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <StatusSheet person={readOnly ? null : selected} eventDate={date} eventLabel={event?.label ?? 'this event'} onSave={onSave} onClose={() => setSelectedId(null)} />
     </div>
   );
 }

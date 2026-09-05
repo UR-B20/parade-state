@@ -78,3 +78,41 @@ export function useSubmit(unitId: string, eventId: string) {
     },
   });
 }
+
+export function useSignIn() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { email: string; password: string }) => api.signIn(v.email, v.password),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+export function useSignOut() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.signOut(),
+    onSuccess: () => {
+      qc.clear();
+    },
+  });
+}
+
+export function useMarkNotificationsRead() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[] | 'all') => api.markNotificationsRead(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.notifications }),
+  });
+}
+
+export function useSetDemoClock() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (now: string | null) => api.setDemoClock(now),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}

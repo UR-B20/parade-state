@@ -24,15 +24,13 @@ export function SkeletonRows({ rows = 6 }: { rows?: number }) {
 export function SkeletonSummary() {
   return (
     <div className="strength" aria-busy="true" aria-label="Loading strength">
-      <div className="strength__top">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Skeleton width={110} height={13} />
-          <Skeleton width={140} height={40} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          <Skeleton width={96} height={28} radius={14} />
-          <Skeleton width={80} height={12} />
-        </div>
+      <div className="strength__row">
+        <Skeleton width={110} height={13} />
+        <Skeleton width={110} height={28} radius={14} />
+      </div>
+      <div className="strength__row">
+        <Skeleton width={140} height={40} />
+        <Skeleton width={80} height={12} />
       </div>
       <Skeleton height={6} radius={3} />
       <Skeleton width="70%" height={12} />

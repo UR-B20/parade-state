@@ -14,7 +14,7 @@ import {
   MarkValidationError, planMark, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
-import { ApiError, type ApiClient, type CreateAdhocBody, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
+import { ApiError, type ApiClient, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
 
 const LATENCY_MS = 220;
 const ADMIN_EMAIL = 's1admin@parade-state.demo';
@@ -25,7 +25,7 @@ interface MockAdhoc extends EventDto { type: 'ADHOC' }
 export class MockApi implements ApiClient {
   private data!: DemoDataset;
   private ready: Promise<void>;
-  private currentEmail = DEFAULT_EMAIL;
+  private currentEmail: string | null = null;
   private demoNow: IsoTimestamp | null;
   private adhoc: MockAdhoc[] = [];
   private cutoffs = { am: '10:00', pm: '14:00' };
@@ -69,7 +69,8 @@ export class MockApi implements ApiClient {
   }
 
   private currentUser(): UserDto {
-    const u = this.data.users.find((x) => x.email === this.currentEmail) ?? this.data.users[1]!;
+    const u = this.currentEmail ? this.data.users.find((x) => x.email === this.currentEmail) : undefined;
+    if (!u) throw new ApiError('UNAUTHORIZED', 'Sign in to continue', 401);
     return { id: u.id, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' };
   }
 
@@ -137,6 +138,27 @@ export class MockApi implements ApiClient {
   }
 
   // ---- auth / meta ----
+
+  signIn(email: string, password: string): Promise<void> {
+    return this.wait(() => {
+      const u = this.data.users.find((x) => x.email === email.trim().toLowerCase());
+      if (!u || password !== 'demo1234') throw new ApiError('UNAUTHORIZED', 'Email or password is incorrect.', 401);
+      this.currentEmail = u.email;
+    });
+  }
+
+  signOut(): Promise<void> {
+    return this.wait(() => {
+      this.currentEmail = null;
+    });
+  }
+
+  demoAccounts(): Promise<DemoAccount[]> {
+    return this.wait(() => [
+      { email: DEFAULT_EMAIL, label: 'Coy 1 commander', role: 'COMMANDER' },
+      { email: ADMIN_EMAIL, label: 'S1 admin', role: 'ADMIN' },
+    ]);
+  }
 
   me(): Promise<MeDto> {
     return this.wait(() => ({

@@ -10,8 +10,14 @@ export interface CreateUserBody { email: string; displayName: string; role: 'ADM
 export interface UpdateUserBody { displayName?: string; unitId?: string | null; isActive?: boolean }
 export interface CreateAdhocBody { date: IsoDate; name: string; cutoffTime: string }
 
+export interface DemoAccount { email: string; label: string; role: 'ADMIN' | 'COMMANDER' }
+
 /** Everything the UI needs from the server. Implemented by the HTTP client and the demo mock. */
 export interface ApiClient {
+  signIn(email: string, password: string): Promise<void>;
+  signOut(): Promise<void>;
+  /** One-tap demo accounts; empty unless demo controls are enabled. */
+  demoAccounts(): Promise<DemoAccount[]>;
   me(): Promise<MeDto>;
   units(): Promise<UnitDto[]>;
   events(date: IsoDate): Promise<EventDto[]>;

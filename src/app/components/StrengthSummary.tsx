@@ -57,22 +57,20 @@ export function StatusLegend({ counts, showZero = false }: { counts: UnitCounts;
 export function StrengthSummary({ counts, report, cutoff, note }: StrengthSummaryProps) {
   return (
     <section className="strength" aria-labelledby="strength-label">
-      <div className="strength__top">
-        <div>
-          <div id="strength-label" className="strength__label">Present strength</div>
-          <div className="strength__figure num">
-            <span className="strength__present">{counts.present}</span>
-            <span className="strength__total">/ {counts.strength}</span>
-          </div>
+      <div className="strength__row">
+        <div id="strength-label" className="strength__label">Present strength</div>
+        {report}
+      </div>
+      <div className="strength__row strength__row--figure">
+        <div className="strength__figure num">
+          <span className="strength__present">{counts.present}</span>
+          <span className="strength__total">/ {counts.strength}</span>
         </div>
-        <div className="strength__report">
-          {report}
-          {cutoff && (
-            <span className={`strength__cutoff num${cutoff.passed ? ' strength__cutoff--passed' : ''}`}>
-              Cut-off {cutoff.time}{cutoff.passed ? ' passed' : ''}
-            </span>
-          )}
-        </div>
+        {cutoff && (
+          <span className={`strength__cutoff num${cutoff.passed ? ' strength__cutoff--passed' : ''}`}>
+            Cut-off {cutoff.time}{cutoff.passed ? ' passed' : ''}
+          </span>
+        )}
       </div>
       <StatusBand counts={counts} label="Attendance" />
       <StatusLegend counts={counts} />

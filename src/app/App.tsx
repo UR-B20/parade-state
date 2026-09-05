@@ -8,6 +8,9 @@ import { AuthProvider } from './state/auth';
 import { DemoProvider } from './state/demo';
 import { ToastProvider } from './components/Toast';
 import { MarkPage } from './pages/commander/MarkPage';
+import { DashboardPage } from './pages/admin/DashboardPage';
+import { LoginPage } from './pages/LoginPage';
+import { useParams } from 'react-router-dom';
 import { SkeletonRows, SkeletonSummary } from './components/Skeleton';
 import { AppHeader } from './components/AppHeader';
 import './pages/pages.css';
@@ -41,6 +44,11 @@ function Home() {
   return <Navigate to={meQ.data.user.role === 'ADMIN' ? '/admin' : '/mark'} replace />;
 }
 
+function AdminUnitPage() {
+  const { unitId } = useParams();
+  return <MarkPage unitId={unitId} />;
+}
+
 function Placeholder({ title }: { title: string }) {
   return (
     <div className="page">
@@ -53,6 +61,7 @@ function Placeholder({ title }: { title: string }) {
 const createRouter = import.meta.env.VITE_HASH_ROUTER === '1' ? createHashRouter : createBrowserRouter;
 
 const router = createRouter([
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
     element: (
@@ -64,8 +73,12 @@ const router = createRouter([
       { index: true, element: <Home /> },
       { path: 'mark', element: <MarkPage /> },
       { path: 'roll', element: <Placeholder title="Manage roll" /> },
-      { path: 'admin/*', element: <Placeholder title="Battalion" /> },
-      { path: 'login', element: <Placeholder title="Sign in" /> },
+      { path: 'account/password', element: <Placeholder title="Change password" /> },
+      { path: 'admin', element: <DashboardPage /> },
+      { path: 'admin/absentees', element: <DashboardPage /> },
+      { path: 'admin/units/:unitId', element: <AdminUnitPage /> },
+      { path: 'admin/users', element: <Placeholder title="Accounts" /> },
+      { path: 'admin/settings', element: <Placeholder title="Cut-offs and date unlocks" /> },
     ],
   },
 ]);
