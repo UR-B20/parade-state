@@ -28,6 +28,14 @@ type Thenable<T> = { then: Promise<T>['then'] };
  */
 export const QUERY_TIMEOUT_MS = 12_000;
 
+/** A statement that never answered. Its message names the statement (no parameter values). */
+export class QueryTimeoutError extends Error {
+  constructor(public readonly statement: string, timeoutMs: number) {
+    super(`Database query timed out after ${timeoutMs} ms: ${statement}`);
+    this.name = 'QueryTimeoutError';
+  }
+}
+
 export function serialQueries<C extends object>(client: C, timeoutMs = QUERY_TIMEOUT_MS): C {
   let chain: Promise<unknown> = Promise.resolve();
   // A query that never answers (pooler stall, dropped socket) becomes a loud 500 with the
@@ -37,7 +45,7 @@ export function serialQueries<C extends object>(client: C, timeoutMs = QUERY_TIM
       const started = Date.now();
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`Database query timed out after ${timeoutMs} ms: ${label}`)), timeoutMs);
+        timer = setTimeout(() => reject(new QueryTimeoutError(label, timeoutMs)), timeoutMs);
       });
       return Promise.race([Promise.resolve(work()), timeout]).finally(() => {
         if (timer) clearTimeout(timer);

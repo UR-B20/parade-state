@@ -57,6 +57,11 @@ export function handleError(err: unknown, c: Context): Response {
     const body: ApiErrorBody = { error: { code: 'INTERNAL', message: `Server configuration incomplete: ${err.message}` } };
     return c.json(body, 503);
   }
+  if (err instanceof Error && err.name === 'QueryTimeoutError') {
+    console.error('Query timeout', err.message);
+    const body: ApiErrorBody = { error: { code: 'INTERNAL', message: err.message } };
+    return c.json(body, 504);
+  }
   console.error('Unhandled error', err);
   const body: ApiErrorBody = {
     error: { code: 'INTERNAL', message: 'Something went wrong on the server. Try again.' },

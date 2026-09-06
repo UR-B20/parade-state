@@ -27,7 +27,11 @@
   //
   // Hyperdrive pools connections to Supabase's transaction-mode pooler near the database.
   // The Worker falls back to SUPABASE_DB_URL when the binding is absent (local dev, tests).
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "c7714a60c3f840f2be3ee0b7e2f0aaf2" }],
+  // Hyperdrive config "soldiertrack-db" (id c7714a60c3f840f2be3ee0b7e2f0aaf2) was created on the
+  // transaction-mode pooler (port 6543) and every query through it timed out on 6 Sep. Recreate
+  // it on the session pooler (port 5432) before binding it again; the Worker connects directly
+  // through SUPABASE_DB_URL meanwhile.
+  // "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<recreate on port 5432>" }],
   "triggers": {
     // 10:05 and 14:05 Singapore time: mark unsubmitted units Late and keep Supabase awake.
     "crons": ["5 2 * * *", "5 6 * * *"]

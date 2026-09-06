@@ -94,9 +94,20 @@ if (r.body.needsBootstrap) {
   r = await api('/auth/bootstrap', { method: 'POST', json: { email: ADMIN.email, displayName: ADMIN.name, password: ADMIN.pw, setupKey: 'wrong-key' } }); check('bootstrap rejects a wrong setup key', r.status === 401 || r.status === 403, String(r.status));
   r = await api('/auth/bootstrap', { method: 'POST', json: { email: ADMIN.email, displayName: ADMIN.name, password: ADMIN.pw, setupKey: SETUP } }); check('bootstrap creates the first admin', r.status === 200 || r.status === 201, `${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
   r = await api('/config'); check('config after bootstrap', r.body.needsBootstrap === false);
-} else console.log('  (admin already exists from the earlier run; bootstrap skipped)');
+} else {
+  // A real admin exists: create the throwaway admin directly (auth user + profile) so the check never touches real accounts.
+  const users = await authUsers();
+  if (!users.some((u) => u.email === ADMIN.email)) {
+    const cu = await fetch(`${SB}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SECRET, authorization: `Bearer ${SECRET}`, 'content-type': 'application/json' }, body: JSON.stringify({ email: ADMIN.email, password: ADMIN.pw, email_confirm: true }) });
+    const cj = await cu.json();
+    const pr = await rest('profiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: cj.id, email: ADMIN.email, display_name: ADMIN.name, role: 'ADMIN', unit_id: null, must_change_password: false }) });
+    check('throwaway admin created directly (real admin already exists)', cu.ok && pr.ok, `${cu.status} ${pr.status}`);
+  } else console.log('  (throwaway admin already exists)');
+}
 const admin = await signIn(ADMIN.email, ADMIN.pw);
 r = await api('/auth/me', { token: admin }); check('admin /me', r.status === 200 && r.body.user.role === 'ADMIN', JSON.stringify({ role: r.body.user?.role, mustChange: r.body.user?.mustChangePassword }));
+await softly('database health steps', async () => { r = await api('/admin/health', { token: admin }); check('database health steps', r.status === 200 && r.body.ok === true, `${r.body.totalMs} ms total; ${(r.body.steps || []).map((x) => `${x.step} ${x.ms}ms`).join(', ')}`); });
+r = await api('/units', { token: admin }); check('units list (two queries)', r.status === 200 && r.body.length === 8 && r.body.find((u) => u.id === 'COY1')?.platoons.length === 4, `${r.body.length} units`);
 r = await api(`/events?date=${today}`, { token: admin }); const am = r.body.find((e) => e.type === 'AM'); check('standard events for today', r.status === 200 && !!am && r.body.some((e) => e.type === 'PM'), r.body.map((e) => e.id).join(','));
 await softly('empty battalion summary', async () => { r = await api(`/admin/summary/${am.id}`, { token: admin }); check('empty battalion summary', r.status === 200 && r.body.totals.strength === 0 && r.body.unitsTotal === 8, JSON.stringify(r.body.totals)); });
 await softly('trends on an empty battalion', async () => { r = await api(`/admin/trends/${am.id}`, { token: admin }); check('trends on an empty battalion', r.status === 200 && r.body.days.length === 14, `days ${r.body.days?.length}`); });
