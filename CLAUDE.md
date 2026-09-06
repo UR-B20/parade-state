@@ -111,8 +111,19 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   moving to the new-style keys (publishable key as `SUPABASE_ANON_KEY`, a new secret key as
   `SUPABASE_SERVICE_ROLE_KEY`). Verify the app works with those key types during the live
   smoke test, then tell the user to click "Disable JWT-based API keys" in Supabase.
-- Next: follow `docs/go-live.md` once the environment variables are present (migrate, verify
-  the empty schema read-only, live smoke test with throwaway accounts, clean up), then guide
-  the user through Cloudflare Workers Builds and the first sign-in.
+- Environment variables arrived on 6 Sep (evening SGT). Verified over HTTPS: the secret key
+  works for the auth admin API, the publishable key works, confirm-email is off, the
+  database is empty. The connection strings were added without the `postgresql:` prefix;
+  prepend it when building `.dev.vars`.
+- The remote Claude environment blocks direct Postgres (ports 5432/6543); only HTTPS goes
+  out. So `pnpm db:migrate` and `pnpm dev` against the live project cannot run here. The
+  schema is applied by Cloudflare Workers Builds (`pnpm db:migrate && pnpm build`) on the
+  first deploy, and the live smoke test runs against the deployed Worker URL over HTTPS.
+  Cleanup of throwaway data goes through PostgREST and the auth admin API with the secret key.
+- A second Claude session ("Go live plan", started 6 Sep 14:55Z from the desktop app on
+  `main`) built a parallel, incompatible implementation on `main` (different table names:
+  absence_spans, present_marks, settings). PR #1 therefore shows conflicts. The owner must
+  choose one; this branch is the complete product. Do not merge the two.
+- Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.
