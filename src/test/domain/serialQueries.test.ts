@@ -62,3 +62,11 @@ describe('serialQueries', () => {
     await expect(c.unsafe('again')).rejects.toThrow('again');
   });
 });
+
+describe('serialQueries timeout', () => {
+  it('turns a query that never answers into an error naming the statement', async () => {
+    const client = { unsafe: (_q: string) => ({ values() { return this; }, then() { /* never settles */ } }) };
+    const c = serialQueries(client, 30) as unknown as typeof client;
+    await expect(c.unsafe('select pg_sleep(60)') as unknown as Promise<unknown>).rejects.toThrow(/timed out after 30 ms: select pg_sleep\(60\)/);
+  });
+});

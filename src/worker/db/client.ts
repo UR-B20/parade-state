@@ -26,10 +26,25 @@ type Thenable<T> = { then: Promise<T>['then'] };
  * services must neither share a connection nor fan out into many. Drizzle only calls
  * `client.unsafe(query, params)` (optionally `.values()`) and `client.begin(fn)`.
  */
-export function serialQueries<C extends object>(client: C): C {
+export const QUERY_TIMEOUT_MS = 12_000;
+
+export function serialQueries<C extends object>(client: C, timeoutMs = QUERY_TIMEOUT_MS): C {
   let chain: Promise<unknown> = Promise.resolve();
-  const run = <T>(work: () => Promise<T> | Thenable<T>): Promise<T> => {
-    const next = chain.then(() => work());
+  // A query that never answers (pooler stall, dropped socket) becomes a loud 500 with the
+  // statement named, instead of a request that hangs until the platform kills it.
+  const run = <T>(label: string, work: () => Promise<T> | Thenable<T>): Promise<T> => {
+    const next = chain.then(() => {
+      const started = Date.now();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Database query timed out after ${timeoutMs} ms: ${label}`)), timeoutMs);
+      });
+      return Promise.race([Promise.resolve(work()), timeout]).finally(() => {
+        if (timer) clearTimeout(timer);
+        const ms = Date.now() - started;
+        if (ms > 2000) console.warn(`slow query ${ms} ms: ${label}`);
+      });
+    });
     chain = next.catch(() => undefined);
     return next;
   };
@@ -42,7 +57,7 @@ export function serialQueries<C extends object>(client: C): C {
             values() { modes.push('values'); return pending; },
             raw() { modes.push('raw'); return pending; },
             then<R1, R2>(onFulfilled?: ((v: unknown) => R1 | PromiseLike<R1>) | null, onRejected?: ((e: unknown) => R2 | PromiseLike<R2>) | null) {
-              return run(() => {
+              return run(String(args[0]).replace(/\s+/g, ' ').slice(0, 90), () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let q = (target as any).unsafe(...args);
                 for (const m of modes) q = q[m]();
@@ -60,7 +75,7 @@ export function serialQueries<C extends object>(client: C): C {
           const fn = args[args.length - 1] as (tx: object) => Promise<unknown>;
           const head = args.slice(0, -1);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return run(() => (target as any).begin(...head, (tx: object) => fn(serialQueries(tx))));
+          return run('transaction', () => (target as any).begin(...head, (tx: object) => fn(serialQueries(tx, timeoutMs))));
         };
       }
       return Reflect.get(target, prop, receiver);
