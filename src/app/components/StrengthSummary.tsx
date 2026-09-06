@@ -5,8 +5,12 @@ import './StrengthSummary.css';
 
 interface StrengthSummaryProps {
   counts: UnitCounts;
+  /** Heading above the figure. */
+  label?: string;
   /** Reporting label (submission pill) shown top-right. */
   report?: ReactNode;
+  /** Extra block under the legend, e.g. a platoon breakdown. */
+  extra?: ReactNode;
   /** 'Cut-off 10:00' or 'Cut-off 10:00 passed'. */
   cutoff?: { time: string; passed: boolean };
   /** Optional caption under the legend. */
@@ -58,11 +62,11 @@ export function StatusLegend({ counts, showZero = false }: { counts: UnitCounts;
   );
 }
 
-export function StrengthSummary({ counts, report, cutoff, note }: StrengthSummaryProps) {
+export function StrengthSummary({ counts, label = 'Present strength', report, cutoff, note, extra }: StrengthSummaryProps) {
   return (
     <section className="strength" aria-labelledby="strength-label">
       <div className="strength__row">
-        <div id="strength-label" className="strength__label">Present strength</div>
+        <div id="strength-label" className="strength__label">{label}</div>
         {report}
       </div>
       <div className="strength__row strength__row--figure">
@@ -79,6 +83,7 @@ export function StrengthSummary({ counts, report, cutoff, note }: StrengthSummar
       <StatusBand counts={counts} label="Attendance" />
       <StatusLegend counts={counts} />
       {note && <p className="strength__note">{note}</p>}
+      {extra}
     </section>
   );
 }

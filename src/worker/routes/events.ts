@@ -6,7 +6,7 @@ import { validation } from '../errors';
 import { createAdhocEvent, listEvents } from '../services/events';
 import { getSettings, resolveNow } from '../services/settings';
 import { body } from '../validate';
-import { units } from '../db/schema';
+import { listUnits } from '../services/platoons';
 
 export const eventRoutes = new Hono<AppEnv>();
 eventRoutes.use('*', requireAuth);
@@ -28,7 +28,4 @@ eventRoutes.post('/', requireAdmin, body(CreateAdhocEventSchema), async (c) => {
 
 export const unitRoutes = new Hono<AppEnv>();
 unitRoutes.use('*', requireAuth);
-unitRoutes.get('/', async (c) => {
-  const rows = await c.get('db').select().from(units).orderBy(units.sortOrder);
-  return c.json(rows.map((u) => ({ id: u.id, name: u.name, sortOrder: u.sortOrder })));
-});
+unitRoutes.get('/', async (c) => c.json(await listUnits(c.get('db'))));

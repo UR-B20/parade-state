@@ -29,6 +29,7 @@ export const MarkBodySchema = v.variant('action', [
 export const CreatePersonSchema = v.object({
   rank: RankSchema,
   name: NameSchema,
+  platoonId: v.nullish(v.pipe(v.string(), v.maxLength(40))),
   serviceNo: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(20))),
   postedInDate: v.optional(IsoDateSchema),
 });
@@ -36,6 +37,7 @@ export const CreatePersonSchema = v.object({
 export const UpdatePersonSchema = v.object({
   rank: v.optional(RankSchema),
   name: v.optional(NameSchema),
+  platoonId: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(40)))),
   serviceNo: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(20))),
   postedOutDate: v.optional(v.nullable(IsoDateSchema)),
 });
@@ -68,6 +70,8 @@ export const BootstrapSchema = v.object({
   password: PasswordSchema,
   setupKey: v.pipe(v.string(), v.minLength(1, 'Enter the setup key')),
 });
+
+export const PlatoonSchema = v.object({ name: v.pipe(v.string(), v.trim(), v.minLength(2, 'Name the platoon'), v.maxLength(30)) });
 
 export const SettingsSchema = v.object({
   cutoffAm: v.optional(ClockTimeSchema),

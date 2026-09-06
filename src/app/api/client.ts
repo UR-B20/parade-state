@@ -1,11 +1,11 @@
 import type {
   AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto,
-  PersonDto, SettingsDto, SubmissionDto, UnitAttendanceDto, UnitDto, UserDto,
+  PersonDto, PlatoonDto, SettingsDto, SubmissionDto, UnitAttendanceDto, UnitDto, UserDto,
 } from '@shared/types';
 import type { IsoDate, IsoTimestamp } from '@shared/dates';
 
-export interface CreatePersonBody { rank: string; name: string; serviceNo?: string | null; postedInDate?: IsoDate }
-export interface UpdatePersonBody { rank?: string; name?: string; serviceNo?: string | null; postedOutDate?: IsoDate | null }
+export interface CreatePersonBody { rank: string; name: string; platoonId?: string | null; serviceNo?: string | null; postedInDate?: IsoDate }
+export interface UpdatePersonBody { rank?: string; name?: string; platoonId?: string | null; serviceNo?: string | null; postedOutDate?: IsoDate | null }
 export interface CreateUserBody { email: string; displayName: string; role: 'ADMIN' | 'COMMANDER'; unitId: string | null; password: string }
 export interface UpdateUserBody { displayName?: string; unitId?: string | null; isActive?: boolean }
 export interface CreateAdhocBody { date: IsoDate; name: string; cutoffTime: string }
@@ -52,6 +52,10 @@ export interface ApiClient {
   createUser(body: CreateUserBody): Promise<UserDto>;
   updateUser(id: string, body: UpdateUserBody): Promise<UserDto>;
   resetPassword(id: string, newPassword: string): Promise<void>;
+
+  createPlatoon(unitId: string, name: string): Promise<PlatoonDto>;
+  renamePlatoon(id: string, name: string): Promise<PlatoonDto>;
+  deletePlatoon(id: string): Promise<void>;
 
   settings(): Promise<SettingsDto>;
   updateSettings(body: { cutoffAm?: string; cutoffPm?: string }): Promise<SettingsDto>;

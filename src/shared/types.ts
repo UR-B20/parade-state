@@ -5,10 +5,19 @@ export type UnitId = 'S1' | 'S2' | 'S3' | 'S4' | 'SSP' | 'COY1' | 'COY2' | 'ISR'
 export type Role = 'ADMIN' | 'COMMANDER';
 export type EventType = 'AM' | 'PM' | 'ADHOC';
 
+export interface PlatoonDto {
+  id: string;
+  unitId: UnitId;
+  name: string;
+  sortOrder: number;
+}
+
 export interface UnitDto {
   id: UnitId;
   name: string;
   sortOrder: number;
+  /** Sub-units, in display order. Empty for staff units. */
+  platoons: PlatoonDto[];
 }
 
 export interface UserDto {
@@ -57,6 +66,7 @@ export interface EventDto {
 export interface PersonDto {
   id: string;
   unitId: UnitId;
+  platoonId: string | null;
   rank: string;
   name: string;
   serviceNo: string | null;
@@ -73,6 +83,7 @@ export interface EffectiveStatus {
   personId: string;
   rank: string;
   name: string;
+  platoonId: string | null;
   status: EffectiveKind;
   subType: OthersSubType | null;
   startDate: IsoDate | null;
@@ -129,11 +140,19 @@ export interface ChangeDiff {
   after: StatusTuple | null;
 }
 
+/** Counts for one platoon; `platoon` is null for personnel without a platoon in a unit that has them. */
+export interface PlatoonCounts {
+  platoon: PlatoonDto | null;
+  counts: UnitCounts;
+}
+
 export interface UnitAttendanceDto {
   unit: UnitDto;
   event: EventDto;
   persons: EffectiveStatus[];
   counts: UnitCounts;
+  /** Per-platoon breakdown; empty for units without platoons. */
+  platoons: PlatoonCounts[];
   submission: SubmissionState;
   changes: ChangeDiff[];
   /** Last change to this unit's attendance for this event. */
@@ -180,6 +199,7 @@ export interface UnitSummaryRow {
   unit: UnitDto;
   counts: UnitCounts;
   submission: SubmissionState;
+  platoons: PlatoonCounts[];
 }
 
 export interface BattalionSummaryDto {

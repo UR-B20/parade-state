@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { isIsoDate, sgDateOf } from '@shared/dates';
-import { DemoClockSchema, SettingsSchema } from '@shared/schemas';
+import { DemoClockSchema, PlatoonSchema, SettingsSchema } from '@shared/schemas';
+import { createPlatoon, deletePlatoon, renamePlatoon } from '../services/platoons';
 import { requireAdmin, requireAuth, type AppEnv } from '../auth/middleware';
 import { dateUnlocks } from '../db/schema';
 import { demoControlsEnabled } from '../env';
@@ -41,6 +42,19 @@ adminSettingsRoutes.delete('/date-unlocks/:date', async (c) => {
   const db = c.get('db');
   await db.delete(dateUnlocks).where(eq(dateUnlocks.date, c.req.param('date')));
   return c.json(await settingsDto(db, c.get('realNow')));
+});
+
+adminSettingsRoutes.post('/units/:unitId/platoons', body(PlatoonSchema), async (c) => {
+  return c.json(await createPlatoon(c.get('db'), c.req.param('unitId'), c.req.valid('json').name), 201);
+});
+
+adminSettingsRoutes.patch('/platoons/:id', body(PlatoonSchema), async (c) => {
+  return c.json(await renamePlatoon(c.get('db'), c.req.param('id'), c.req.valid('json').name));
+});
+
+adminSettingsRoutes.delete('/platoons/:id', async (c) => {
+  await deletePlatoon(c.get('db'), c.req.param('id'));
+  return c.json({ ok: true });
 });
 
 adminSettingsRoutes.get('/demo-clock', async (c) => {

@@ -6,12 +6,12 @@
 import { addDays, formatSgTime, sgDateOf, sgLocalToIso, type IsoDate, type IsoTimestamp } from '@shared/dates';
 import type { AbsenceStatus } from '@shared/statuses';
 import type {
-  AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto,
+  AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto, PlatoonDto,
   SettingsDto, SubmissionDto, SubmissionState, UnitAttendanceDto, UnitDto, UnitId, UserDto,
 } from '@shared/types';
 import {
   awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, isDateLocked,
-  MarkValidationError, planMark, planMarkRemainingPresent, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
+  MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
@@ -77,7 +77,12 @@ export class MockApi implements ApiClient {
   private unit(unitId: string): UnitDto {
     const u = this.data.units.find((x) => x.id === unitId);
     if (!u) throw new ApiError('NOT_FOUND', 'Unit not found', 404);
-    return u;
+    return { ...u, platoons: this.data.platoons.filter((p) => p.unitId === u.id).sort((a, b) => a.sortOrder - b.sortOrder) };
+  }
+
+  private assertPlatoon(unitId: string, platoonId: string | null | undefined) {
+    if (!platoonId) return;
+    if (!this.data.platoons.some((p) => p.id === platoonId && p.unitId === unitId)) throw new ApiError('VALIDATION', 'Choose a platoon of this unit', 400, { field: 'platoonId' });
   }
 
   private eventLabel(type: EventDto['type'], name: string | null): string {
@@ -187,7 +192,33 @@ export class MockApi implements ApiClient {
   }
 
   units(): Promise<UnitDto[]> {
-    return this.wait(() => [...this.data.units]);
+    return this.wait(() => this.data.units.map((u) => this.unit(u.id)));
+  }
+
+  createPlatoon(unitId: string, name: string): Promise<PlatoonDto> {
+    return this.wait(() => {
+      const unit = this.unit(unitId);
+      if (unit.platoons.some((p) => p.name.toLowerCase() === name.toLowerCase())) throw new ApiError('CONFLICT', 'A platoon with this name already exists', 409);
+      const p: PlatoonDto = { id: `${unitId}-${this.newId('pl')}`, unitId: unit.id, name, sortOrder: (unit.platoons.at(-1)?.sortOrder ?? -1) + 1 };
+      this.data.platoons.push(p);
+      return p;
+    });
+  }
+
+  renamePlatoon(id: string, name: string): Promise<PlatoonDto> {
+    return this.wait(() => {
+      const p = this.data.platoons.find((x) => x.id === id);
+      if (!p) throw new ApiError('NOT_FOUND', 'Platoon not found', 404);
+      p.name = name;
+      return { ...p };
+    });
+  }
+
+  deletePlatoon(id: string): Promise<void> {
+    return this.wait(() => {
+      if (this.data.personnel.some((x) => x.platoonId === id)) throw new ApiError('CONFLICT', 'Move its personnel to another platoon first', 409);
+      this.data.platoons = this.data.platoons.filter((x) => x.id !== id);
+    });
   }
 
   events(date: IsoDate): Promise<EventDto[]> {
@@ -226,14 +257,15 @@ export class MockApi implements ApiClient {
     return this.wait(() =>
       this.data.personnel
         .filter((p) => p.unitId === unitId && (includeInactive || p.postedOutDate === null))
-        .map((p) => ({ id: p.id, unitId: p.unitId, rank: p.rank, name: p.name, serviceNo: p.serviceNo, postedInDate: p.postedInDate, postedOutDate: p.postedOutDate })),
+        .map((p) => ({ id: p.id, unitId: p.unitId, platoonId: p.platoonId, rank: p.rank, name: p.name, serviceNo: p.serviceNo, postedInDate: p.postedInDate, postedOutDate: p.postedOutDate })),
     );
   }
 
   createPerson(unitId: string, body: CreatePersonBody): Promise<PersonDto> {
     return this.wait(() => {
       const unit = this.unit(unitId);
-      const p = { id: this.newId('p'), unitId: unit.id, rank: body.rank, name: body.name.trim(), serviceNo: body.serviceNo ?? null, postedInDate: body.postedInDate ?? this.today(), postedOutDate: null };
+      this.assertPlatoon(unitId, body.platoonId);
+      const p = { id: this.newId('p'), unitId: unit.id, platoonId: body.platoonId ?? null, rank: body.rank, name: body.name.trim(), serviceNo: body.serviceNo ?? null, postedInDate: body.postedInDate ?? this.today(), postedOutDate: null };
       this.data.personnel.push(p);
       return { ...p };
     });
@@ -243,6 +275,10 @@ export class MockApi implements ApiClient {
     return this.wait(() => {
       const p = this.data.personnel.find((x) => x.id === personId && x.unitId === unitId);
       if (!p) throw new ApiError('NOT_FOUND', 'Person not found', 404);
+      if (body.platoonId !== undefined) {
+        this.assertPlatoon(unitId, body.platoonId);
+        p.platoonId = body.platoonId;
+      }
       if (body.rank !== undefined) p.rank = body.rank;
       if (body.name !== undefined) p.name = body.name.trim();
       if (body.serviceNo !== undefined) p.serviceNo = body.serviceNo;
@@ -262,7 +298,7 @@ export class MockApi implements ApiClient {
       const sub = await this.submissionFor(unitId, event, hash);
       const user = this.currentUser();
       const locked = user.role === 'ADMIN' ? false : isDateLocked(event.date, this.today(), this.unlocks, this.now());
-      return { unit, event, persons: statuses, counts, submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
+      return { unit, event, persons: statuses, counts, platoons: platoonBreakdown(statuses, unit.platoons), submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
     });
   }
 
@@ -361,11 +397,12 @@ export class MockApi implements ApiClient {
     return this.wait(async () => {
       const event = this.eventById(eventId);
       const rows = [];
-      for (const unit of this.data.units) {
+      for (const u of this.data.units) {
+        const unit = this.unit(u.id);
         const { statuses, counts } = this.computeUnit(unit.id, event);
         const hash = await contentHash(statuses);
         const sub = await this.submissionFor(unit.id, event, hash);
-        rows.push({ unit, counts, submission: sub.state });
+        rows.push({ unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) });
       }
       this.ensureLateNotifications(event);
       rows.sort((a, b) => awaitingRank(a.submission) - awaitingRank(b.submission) || a.unit.sortOrder - b.unit.sortOrder);

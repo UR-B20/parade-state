@@ -22,6 +22,14 @@ export const units = pgTable('units', {
   sortOrder: integer('sort_order').notNull(),
 });
 
+/** Sub-units of the companies (platoons and a HQ element). Staff units have none. */
+export const platoons = pgTable('platoons', {
+  id: text('id').primaryKey(),
+  unitId: text('unit_id').notNull().references(() => units.id),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull(),
+}, (t) => [index('platoons_unit_idx').on(t.unitId, t.sortOrder)]);
+
 /** One row per Supabase Auth user. The FK to auth.users is added by the Supabase-only migration. */
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey(),
@@ -41,6 +49,7 @@ export const profiles = pgTable('profiles', {
 export const personnel = pgTable('personnel', {
   id: uuid('id').primaryKey().defaultRandom(),
   unitId: text('unit_id').notNull().references(() => units.id),
+  platoonId: text('platoon_id').references(() => platoons.id),
   rank: text('rank').notNull(),
   name: text('name').notNull(),
   serviceNo: text('service_no'),
@@ -157,6 +166,7 @@ export const dateUnlocks = pgTable('date_unlocks', {
   expiresAt: tz('expires_at').notNull(),
 });
 
+export type PlatoonRow = typeof platoons.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
 export type PersonnelRow = typeof personnel.$inferSelect;
 export type EventRow = typeof events.$inferSelect;

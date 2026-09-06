@@ -1,8 +1,9 @@
-import { awaitingRank, sumCounts } from '@shared/domain';
-import type { AbsenteeDto, AbsenteesDto, BattalionSummaryDto, UnitId, UnitSummaryRow } from '@shared/types';
+import { awaitingRank, platoonBreakdown, sumCounts } from '@shared/domain';
+import type { AbsenteeDto, AbsenteesDto, BattalionSummaryDto, UnitSummaryRow } from '@shared/types';
 import { ABSENCE_STATUSES } from '@shared/statuses';
 import type { Db } from '../db/client';
-import { units, type EventRow } from '../db/schema';
+import type { EventRow } from '../db/schema';
+import { listUnits } from './platoons';
 import type { Bindings } from '../env';
 import { computeUnit, submissionStateFor } from './attendance';
 import { toEventDto } from './events';
@@ -10,12 +11,12 @@ import { ensureLateNotifications } from './notifications';
 import { resolveNow } from './settings';
 
 async function unitRows(db: Db, event: EventRow, now: Date) {
-  const all = await db.select().from(units).orderBy(units.sortOrder);
+  const all = await listUnits(db);
   return Promise.all(
     all.map(async (u) => {
       const { statuses, counts, hash } = await computeUnit(db, u.id, event);
       const sub = await submissionStateFor(db, u.id, event, hash, now);
-      const row: UnitSummaryRow = { unit: { id: u.id as UnitId, name: u.name, sortOrder: u.sortOrder }, counts, submission: sub.state };
+      const row: UnitSummaryRow = { unit: u, counts, submission: sub.state, platoons: platoonBreakdown(statuses, u.platoons) };
       return { row, statuses };
     }),
   );

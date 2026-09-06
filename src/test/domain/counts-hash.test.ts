@@ -3,7 +3,7 @@ import { canonicalizeUnitState, contentHash, sumCounts, unitCounts } from '@shar
 import type { EffectiveStatus } from '@shared/types';
 
 const es = (over: Partial<EffectiveStatus>): EffectiveStatus => ({
-  personId: 'p', rank: 'PTE', name: 'X', status: 'UNMARKED', subType: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
+  personId: 'p', rank: 'PTE', name: 'X', platoonId: null, status: 'UNMARKED', subType: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
 });
 
 describe('unitCounts', () => {

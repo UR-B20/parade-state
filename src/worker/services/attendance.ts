@@ -1,22 +1,21 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { IsoDate } from '@shared/dates';
 import {
-  contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, MarkValidationError, planMark, planMarkRemainingPresent, unitCounts,
+  contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, unitCounts,
   type SpanRow,
 } from '@shared/domain';
-import type { ChangeDiff, EffectiveStatus, MarkBody, MarkResultDto, SubmissionState, UnitAttendanceDto, UnitCounts, UnitDto, UnitId } from '@shared/types';
+import type { ChangeDiff, EffectiveStatus, MarkBody, MarkResultDto, SubmissionState, UnitAttendanceDto, UnitCounts, UnitDto } from '@shared/types';
 import type { Db } from '../db/client';
-import { eventMarks, events, personnel, statusSpans, submissions, unitEventState, units, type EventRow, type ProfileRow } from '../db/schema';
+import { eventMarks, events, personnel, statusSpans, submissions, unitEventState, type EventRow, type ProfileRow } from '../db/schema';
 import type { Bindings } from '../env';
 import { AppError, notFound, validation } from '../errors';
 import { toEventDto } from './events';
 import { activePersonnelOn } from './roll';
 import { isLockedForCommander, resolveNow } from './settings';
+import { getUnitWithPlatoons } from './platoons';
 
 export async function getUnit(db: Db, unitId: string): Promise<UnitDto> {
-  const [row] = await db.select().from(units).where(eq(units.id, unitId));
-  if (!row) throw notFound('Unit');
-  return { id: row.id as UnitId, name: row.name, sortOrder: row.sortOrder };
+  return getUnitWithPlatoons(db, unitId);
 }
 
 export function toSpanRow(s: typeof statusSpans.$inferSelect): SpanRow {
@@ -76,7 +75,7 @@ export async function loadUnitState(db: Db, env: Bindings, unitId: string, event
   const { statuses, counts, hash } = await computeUnit(db, unitId, event);
   const sub = await submissionStateFor(db, unitId, event, hash, now, statuses);
   const locked = user.role === 'ADMIN' ? false : await isLockedForCommander(db, event.date, now);
-  return { unit, event: toEventDto(event), persons: statuses, counts, submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
+  return { unit, event: toEventDto(event), persons: statuses, counts, platoons: platoonBreakdown(statuses, unit.platoons), submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
 }
 
 /** Records that the unit touched this event; drives Pending and the footer's Updated time. */

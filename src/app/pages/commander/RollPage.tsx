@@ -9,7 +9,9 @@ import type { PersonDto } from '@shared/types';
 import { ApiError, type CreatePersonBody } from '../../api/client';
 import { keys } from '../../api/keys';
 import { useApi } from '../../api/provider';
-import { usePersonnel } from '../../api/queries';
+import { usePersonnel, useUnits } from '../../api/queries';
+import type { PlatoonDto } from '@shared/types';
+import { platoonName } from '../../components/PlatoonPicker';
 import { useAuth } from '../../state/auth';
 import { AccountButton, AccountMenu } from '../../components/AccountMenu';
 import { AppHeader } from '../../components/AppHeader';
@@ -34,6 +36,8 @@ export function RollPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   const unitId = unitIdProp ?? me.user.unitId;
   const [showInactive, setShowInactive] = useState(false);
   const rollQ = usePersonnel(unitId, showInactive);
+  const unitsQ = useUnits();
+  const platoons = useMemo(() => unitsQ.data?.find((u) => u.id === unitId)?.platoons ?? [], [unitsQ.data, unitId]);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<PersonDto | 'new' | null>(null);
   const [postingOut, setPostingOut] = useState<PersonDto | null>(null);
@@ -47,7 +51,7 @@ export function RollPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
 
   const save = useMutation({
     mutationFn: (input: { id?: string; body: CreatePersonBody }) =>
-      input.id ? api.updatePerson(unitId!, input.id, { rank: input.body.rank, name: input.body.name, serviceNo: input.body.serviceNo ?? null }) : api.createPerson(unitId!, input.body),
+      input.id ? api.updatePerson(unitId!, input.id, { rank: input.body.rank, name: input.body.name, platoonId: input.body.platoonId ?? null, serviceNo: input.body.serviceNo ?? null }) : api.createPerson(unitId!, input.body),
     onSuccess: (_p, input) => { invalidate(); toast.show(input.id ? 'Saved' : 'Added to the roll'); setEditing(null); },
   });
   const postOut = useMutation({
@@ -99,6 +103,7 @@ export function RollPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
                     <span className="person__meta">
                       <span className="person__rank">{p.rank}</span>
                       <span className="person__detail truncate num">
+                        {platoons.length > 0 ? `${platoonName(platoons, p.platoonId)} · ` : ''}
                         {p.postedOutDate ? `Posted out ${formatSgDateShort(p.postedOutDate, today)}` : `Since ${formatSgDateShort(p.postedInDate, today)}`}
                         {p.serviceNo ? ` · ${p.serviceNo}` : ''}
                       </span>
@@ -123,6 +128,7 @@ export function RollPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
 
       <PersonSheet
         person={editing}
+        platoons={platoons}
         busy={save.isPending}
         onClose={() => setEditing(null)}
         onSave={(body, id) => save.mutate({ id, body }, { onError: (err) => toast.show(err instanceof ApiError ? err.message : "Couldn't save.", { tone: 'error' }) })}
@@ -148,10 +154,11 @@ export function RollPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   );
 }
 
-function PersonSheet({ person, busy, onClose, onSave, onPostOut }: { person: PersonDto | 'new' | null; busy: boolean; onClose: () => void; onSave: (body: CreatePersonBody, id?: string) => void; onPostOut: (p: PersonDto) => void }) {
+function PersonSheet({ person, platoons, busy, onClose, onSave, onPostOut }: { person: PersonDto | 'new' | null; platoons: PlatoonDto[]; busy: boolean; onClose: () => void; onSave: (body: CreatePersonBody, id?: string) => void; onPostOut: (p: PersonDto) => void }) {
   const isNew = person === 'new';
   const existing = person && person !== 'new' ? person : null;
   const [rank, setRank] = useState(existing?.rank ?? 'PTE');
+  const [platoonId, setPlatoonId] = useState<string>(existing?.platoonId ?? platoons[0]?.id ?? '');
   const [name, setName] = useState(existing?.name ?? '');
   const [serviceNo, setServiceNo] = useState(existing?.serviceNo ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -162,13 +169,14 @@ function PersonSheet({ person, busy, onClose, onSave, onPostOut }: { person: Per
   if (currentKey !== key) {
     setKey(currentKey);
     setRank(existing?.rank ?? 'PTE');
+    setPlatoonId(existing?.platoonId ?? platoons[0]?.id ?? '');
     setName(existing?.name ?? '');
     setServiceNo(existing?.serviceNo ?? '');
     setErrors({});
   }
 
   const submit = () => {
-    const parsed = v.safeParse(CreatePersonSchema, { rank, name, serviceNo: serviceNo.trim() || null });
+    const parsed = v.safeParse(CreatePersonSchema, { rank, name, platoonId: platoons.length ? platoonId || null : null, serviceNo: serviceNo.trim() || null });
     if (!parsed.success) return setErrors(firstIssue(parsed.issues));
     onSave(parsed.output, existing?.id);
   };
@@ -197,6 +205,16 @@ function PersonSheet({ person, busy, onClose, onSave, onPostOut }: { person: Per
         </select>
         {errors['rank'] && <span className="field__error" role="alert">{errors['rank']}</span>}
       </label>
+      {platoons.length > 0 && (
+        <label className="field">
+          <span className="field__label">Platoon</span>
+          <select className="field__input" value={platoonId} onChange={(e) => setPlatoonId(e.target.value)} aria-invalid={!!errors['platoonId'] || undefined}>
+            {platoons.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="">Unassigned</option>
+          </select>
+          {errors['platoonId'] && <span className="field__error" role="alert">{errors['platoonId']}</span>}
+        </label>
+      )}
       <label className="field">
         <span className="field__label">Name</span>
         <input className="field__input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" aria-invalid={!!errors['name'] || undefined} placeholder="As on the nominal roll" />

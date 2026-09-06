@@ -5,7 +5,7 @@
  */
 import { addDays, sgLocalToIso, type IsoDate, type IsoTimestamp } from '../dates';
 import type { AbsenceStatus, OthersSubType } from '../statuses';
-import type { NotificationType, Role, UnitDto, UnitId } from '../types';
+import type { NotificationType, PlatoonDto, Role, UnitDto, UnitId } from '../types';
 import { contentHash, toSnapshot, type SnapshotEntry } from '../domain/canonical';
 import { effectiveStatuses, type RollPerson, type SpanRow } from '../domain/effectiveStatus';
 import { unitCounts } from '../domain/counts';
@@ -17,15 +17,32 @@ export const DEMO_NOW: IsoTimestamp = sgLocalToIso(DEMO_DATE, '09:24');
 export const DEMO_PASSWORD = 'demo1234';
 export const DEMO_EMAIL_DOMAIN = 'parade-state.demo';
 
+/** Companies are organised into platoons plus a HQ element; staff units are not. */
+export const DEMO_PLATOONS: PlatoonDto[] = [
+  { id: 'COY1-HQ', unitId: 'COY1', name: 'Coy HQ', sortOrder: 0 },
+  { id: 'COY1-P1', unitId: 'COY1', name: 'Platoon 1', sortOrder: 1 },
+  { id: 'COY1-P2', unitId: 'COY1', name: 'Platoon 2', sortOrder: 2 },
+  { id: 'COY1-P3', unitId: 'COY1', name: 'Platoon 3', sortOrder: 3 },
+  { id: 'COY2-HQ', unitId: 'COY2', name: 'Coy HQ', sortOrder: 0 },
+  { id: 'COY2-P1', unitId: 'COY2', name: 'Platoon 1', sortOrder: 1 },
+  { id: 'COY2-P2', unitId: 'COY2', name: 'Platoon 2', sortOrder: 2 },
+  { id: 'COY2-P3', unitId: 'COY2', name: 'Platoon 3', sortOrder: 3 },
+  { id: 'ISR-HQ', unitId: 'ISR', name: 'Coy HQ', sortOrder: 0 },
+  { id: 'ISR-P1', unitId: 'ISR', name: 'Platoon 1', sortOrder: 1 },
+  { id: 'ISR-P2', unitId: 'ISR', name: 'Platoon 2', sortOrder: 2 },
+];
+
+const platoonsOf = (unitId: UnitId) => DEMO_PLATOONS.filter((p) => p.unitId === unitId);
+
 export const DEMO_UNITS: UnitDto[] = [
-  { id: 'S1', name: 'S1', sortOrder: 1 },
-  { id: 'S2', name: 'S2', sortOrder: 2 },
-  { id: 'S3', name: 'S3', sortOrder: 3 },
-  { id: 'S4', name: 'S4', sortOrder: 4 },
-  { id: 'SSP', name: 'SSP', sortOrder: 5 },
-  { id: 'COY1', name: 'Coy 1', sortOrder: 6 },
-  { id: 'COY2', name: 'Coy 2', sortOrder: 7 },
-  { id: 'ISR', name: 'ISR Coy', sortOrder: 8 },
+  { id: 'S1', name: 'S1', sortOrder: 1, platoons: [] },
+  { id: 'S2', name: 'S2', sortOrder: 2, platoons: [] },
+  { id: 'S3', name: 'S3', sortOrder: 3, platoons: [] },
+  { id: 'S4', name: 'S4', sortOrder: 4, platoons: [] },
+  { id: 'SSP', name: 'SSP', sortOrder: 5, platoons: [] },
+  { id: 'COY1', name: 'Coy 1', sortOrder: 6, platoons: platoonsOf('COY1') },
+  { id: 'COY2', name: 'Coy 2', sortOrder: 7, platoons: platoonsOf('COY2') },
+  { id: 'ISR', name: 'ISR Coy', sortOrder: 8, platoons: platoonsOf('ISR') },
 ];
 
 interface UnitSpec {
@@ -60,6 +77,7 @@ export interface DemoUser {
 
 export interface DemoPerson extends RollPerson {
   unitId: UnitId;
+  platoonId: string | null;
   serviceNo: string | null;
 }
 
@@ -119,6 +137,7 @@ export interface DemoDataset {
   date: IsoDate;
   now: IsoTimestamp;
   units: UnitDto[];
+  platoons: PlatoonDto[];
   users: DemoUser[];
   personnel: DemoPerson[];
   events: DemoEvent[];
@@ -231,10 +250,42 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
       else rankPool.pop();
     }
     for (const f of fixed) {
-      unitPeople.push({ id: rng.uuid(), unitId: spec.id, rank: f.rank, name: f.name, serviceNo: null, postedInDate: addDays(date, -rng.int(60, 700)), postedOutDate: null });
+      unitPeople.push({ id: rng.uuid(), unitId: spec.id, platoonId: null, rank: f.rank, name: f.name, serviceNo: null, postedInDate: addDays(date, -rng.int(60, 700)), postedOutDate: null });
     }
     for (const rank of rankPool) {
-      unitPeople.push({ id: rng.uuid(), unitId: spec.id, rank, name: randomName(rng, usedNames), serviceNo: null, postedInDate: addDays(date, -rng.int(30, 900)), postedOutDate: null });
+      unitPeople.push({ id: rng.uuid(), unitId: spec.id, platoonId: null, rank, name: randomName(rng, usedNames), serviceNo: null, postedInDate: addDays(date, -rng.int(30, 900)), postedOutDate: null });
+    }
+    // Companies: HQ element takes the OC, 2IC, CSM, CQMS and a few others; the rest fill the platoons evenly.
+    const unitPlatoons = platoonsOf(spec.id);
+    if (unitPlatoons.length > 0) {
+      const hq = unitPlatoons.find((p) => p.name === 'Coy HQ')!;
+      const line = unitPlatoons.filter((p) => p !== hq);
+      const fixedNamesSet = new Set(fixed.map((f) => f.name));
+      const hqRanks = new Set(['CPT', 'LTA', '2WO', '1SG', 'MAJ']);
+      const hqFill = ['2SG', 'CPL', 'LCP'];
+      let hqLeft = 8;
+      for (const p of unitPeople) {
+        if (hqLeft > 0 && hqRanks.has(p.rank) && !fixedNamesSet.has(p.name)) {
+          p.platoonId = hq.id;
+          hqLeft -= 1;
+        }
+      }
+      for (const rank of hqFill) {
+        for (const p of unitPeople) {
+          if (hqLeft > 0 && !p.platoonId && p.rank === rank && !fixedNamesSet.has(p.name)) {
+            p.platoonId = hq.id;
+            hqLeft -= 1;
+          }
+        }
+      }
+      let i = 0;
+      for (const p of unitPeople) {
+        if (p.platoonId) continue;
+        p.platoonId = line[i % line.length]!.id;
+        i += 1;
+      }
+      // The brief's example rows all sit in Platoon 1.
+      for (const f of fixed) unitPeople.find((p) => p.name === f.name)!.platoonId = line[0]!.id;
     }
     personnel.push(...unitPeople);
 
@@ -326,5 +377,5 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
   }
   notifications.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
-  return { date, now: DEMO_NOW, units: DEMO_UNITS, users, personnel, events, spans, marks, unitEventState, submissions, notifications };
+  return { date, now: DEMO_NOW, units: DEMO_UNITS, platoons: DEMO_PLATOONS, users, personnel, events, spans, marks, unitEventState, submissions, notifications };
 }

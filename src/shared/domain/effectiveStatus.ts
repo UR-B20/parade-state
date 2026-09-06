@@ -10,6 +10,7 @@ export interface RollPerson {
   name: string;
   postedInDate: IsoDate;
   postedOutDate: IsoDate | null;
+  platoonId?: string | null;
 }
 
 /** An absence span as stored; only active (non-superseded) spans should be passed in. */
@@ -53,7 +54,7 @@ export function effectiveStatuses(
   const result: EffectiveStatus[] = [];
   for (const person of persons) {
     if (!isActiveOn(person, eventDate)) continue;
-    const base = { personId: person.id, rank: person.rank, name: person.name };
+    const base = { personId: person.id, rank: person.rank, name: person.name, platoonId: person.platoonId ?? null };
     if (presentMarks.has(person.id)) {
       result.push({ ...base, status: 'PRESENT', subType: null, startDate: null, endDate: null, remark: null, spanId: null });
       continue;

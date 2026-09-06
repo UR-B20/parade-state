@@ -1,6 +1,6 @@
 import type { DemoDataset } from '@shared/demo/dataset';
 import type { Db } from './client';
-import { appSettings, eventMarks, events, notifications, personnel, profiles, statusSpans, submissions, unitEventState } from './schema';
+import { appSettings, eventMarks, events, notifications, personnel, platoons, profiles, statusSpans, submissions, unitEventState } from './schema';
 
 /**
  * Inserts the fictional battalion. `userIds` maps dataset user ids to real profile ids (Supabase
@@ -24,8 +24,9 @@ export async function insertDemoData(db: Db, data: DemoDataset, userIds: Map<str
       .values(data.users.map((u) => ({ id: uid(u.id), email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false })))
       .onConflictDoNothing();
 
+    await tx.insert(platoons).values(data.platoons.map((p) => ({ id: p.id, unitId: p.unitId, name: p.name, sortOrder: p.sortOrder }))).onConflictDoNothing();
     for (const rows of chunk(data.personnel)) {
-      await tx.insert(personnel).values(rows.map((p) => ({ id: p.id, unitId: p.unitId, rank: p.rank, name: p.name, serviceNo: p.serviceNo, postedInDate: p.postedInDate, postedOutDate: p.postedOutDate }))).onConflictDoNothing();
+      await tx.insert(personnel).values(rows.map((p) => ({ id: p.id, unitId: p.unitId, platoonId: p.platoonId, rank: p.rank, name: p.name, serviceNo: p.serviceNo, postedInDate: p.postedInDate, postedOutDate: p.postedOutDate }))).onConflictDoNothing();
     }
     await tx.insert(events).values(data.events.map((e) => ({ id: e.id, date: e.date, type: e.type, cutoffAt: new Date(e.cutoffAt) }))).onConflictDoNothing();
     for (const rows of chunk(data.spans)) {

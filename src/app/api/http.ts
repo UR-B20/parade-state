@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IsoDate, IsoTimestamp } from '@shared/dates';
 import type {
-  AbsenteesDto, ApiErrorBody, BattalionSummaryDto, ConfigDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto,
+  AbsenteesDto, ApiErrorBody, BattalionSummaryDto, ConfigDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto, PlatoonDto,
   SettingsDto, SubmissionDto, UnitAttendanceDto, UnitDto, UserDto,
 } from '@shared/types';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type CreatePersonBody, type CreateUserBody, type DemoAccount, type UpdatePersonBody, type UpdateUserBody } from './client';
@@ -121,6 +121,10 @@ export class HttpApi implements ApiClient {
   createUser(body: CreateUserBody) { return this.call<UserDto>('/admin/users', { method: 'POST', json: body }); }
   updateUser(id: string, body: UpdateUserBody) { return this.call<UserDto>(`/admin/users/${id}`, { method: 'PATCH', json: body }); }
   resetPassword(id: string, newPassword: string) { return this.call<void>(`/admin/users/${id}/reset-password`, { method: 'POST', json: { newPassword } }); }
+
+  createPlatoon(unitId: string, name: string) { return this.call<PlatoonDto>(`/admin/units/${unitId}/platoons`, { method: 'POST', json: { name } }); }
+  renamePlatoon(id: string, name: string) { return this.call<PlatoonDto>(`/admin/platoons/${id}`, { method: 'PATCH', json: { name } }); }
+  deletePlatoon(id: string) { return this.call<void>(`/admin/platoons/${id}`, { method: 'DELETE' }); }
 
   settings() { return this.call<SettingsDto>('/admin/settings'); }
   updateSettings(body: { cutoffAm?: string; cutoffPm?: string }) { return this.call<SettingsDto>('/admin/settings', { method: 'PUT', json: body }); }

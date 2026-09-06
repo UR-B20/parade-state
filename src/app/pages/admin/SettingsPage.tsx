@@ -5,7 +5,7 @@ import { formatSgDateLong, formatSgTime, isIsoDate, sgDateOf } from '@shared/dat
 import { ApiError } from '../../api/client';
 import { keys } from '../../api/keys';
 import { useApi } from '../../api/provider';
-import { useSettings } from '../../api/queries';
+import { useSettings, useUnits } from '../../api/queries';
 import { useAuth } from '../../state/auth';
 import { AccountButton, AccountMenu } from '../../components/AccountMenu';
 import { AppHeader } from '../../components/AppHeader';
@@ -22,6 +22,9 @@ export function SettingsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const settingsQ = useSettings(true);
+  const unitsQ = useUnits();
+  const [newPlatoon, setNewPlatoon] = useState<Record<string, string>>({});
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [am, setAm] = useState<string | null>(null);
   const [pm, setPm] = useState<string | null>(null);
   const [unlockDate, setUnlockDate] = useState('');
@@ -29,6 +32,10 @@ export function SettingsPage() {
   const today = sgDateOf(new Date(me.demo.now ?? me.serverNow));
   const onError = (err: unknown) => toast.show(err instanceof ApiError ? err.message : 'Something went wrong.', { tone: 'error' });
   const done = () => { void qc.invalidateQueries({ queryKey: keys.settings }); void qc.invalidateQueries({ queryKey: ['events'] }); };
+  const platoonDone = () => { void qc.invalidateQueries({ queryKey: keys.units }); void qc.invalidateQueries({ queryKey: ['summary'] }); };
+  const addPlatoon = useMutation({ mutationFn: (v: { unitId: string; name: string }) => api.createPlatoon(v.unitId, v.name), onSuccess: (_p, v) => { platoonDone(); setNewPlatoon((m) => ({ ...m, [v.unitId]: '' })); toast.show('Platoon added'); }, onError });
+  const renamePlatoon = useMutation({ mutationFn: (v: { id: string; name: string }) => api.renamePlatoon(v.id, v.name), onSuccess: () => { platoonDone(); setRenaming(null); toast.show('Platoon renamed'); }, onError });
+  const removePlatoon = useMutation({ mutationFn: (id: string) => api.deletePlatoon(id), onSuccess: () => { platoonDone(); toast.show('Platoon removed'); }, onError });
 
   const saveCutoffs = useMutation({
     mutationFn: () => api.updateSettings({ cutoffAm: am ?? undefined, cutoffPm: pm ?? undefined }),
@@ -72,6 +79,39 @@ export function SettingsPage() {
                 </label>
               </div>
               <Button variant="primary" disabled={!cutoffsDirty} busy={saveCutoffs.isPending} onClick={() => saveCutoffs.mutate()}>Save cut-offs</Button>
+            </section>
+
+            <section className="roll" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} aria-labelledby="platoon-title">
+              <h2 id="platoon-title" className="dialog__title" style={{ fontSize: 'var(--fs-body-lg)' }}>Platoons</h2>
+              <p className="dialog__muted">Companies report by platoon. Staff units have no platoons. Commanders assign personnel to a platoon in Manage roll.</p>
+              {(unitsQ.data ?? []).filter((u) => u.id.startsWith('COY') || u.id === 'ISR' || u.platoons.length > 0).map((u) => (
+                <div key={u.id} className="field">
+                  <span className="field__label">{u.name}</span>
+                  <ul className="roll">
+                    {u.platoons.map((p) => (
+                      <li key={p.id} className="absentee" style={{ minHeight: 52 }}>
+                        {renaming?.id === p.id ? (
+                          <>
+                            <input className="field__input" value={renaming.name} onChange={(e) => setRenaming({ id: p.id, name: e.target.value })} aria-label="Platoon name" />
+                            <Button small variant="primary" busy={renamePlatoon.isPending} onClick={() => renamePlatoon.mutate(renaming)}>Save</Button>
+                            <Button small variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="absentee__main"><span className="absentee__name">{p.name}</span></span>
+                            <Button small variant="ghost" onClick={() => setRenaming({ id: p.id, name: p.name })}>Rename</Button>
+                            <Button small variant="danger-ghost" busy={removePlatoon.isPending && removePlatoon.variables === p.id} onClick={() => removePlatoon.mutate(p.id)}>Remove</Button>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input className="field__input" placeholder={`New platoon in ${u.name}`} value={newPlatoon[u.id] ?? ''} onChange={(e) => setNewPlatoon((m) => ({ ...m, [u.id]: e.target.value }))} aria-label={`New platoon in ${u.name}`} />
+                    <Button disabled={!(newPlatoon[u.id] ?? '').trim()} busy={addPlatoon.isPending && addPlatoon.variables?.unitId === u.id} onClick={() => addPlatoon.mutate({ unitId: u.id, name: (newPlatoon[u.id] ?? '').trim() })}>Add</Button>
+                  </div>
+                </div>
+              ))}
             </section>
 
             <section className="roll" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} aria-labelledby="unlock-title">

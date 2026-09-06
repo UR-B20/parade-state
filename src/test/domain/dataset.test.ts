@@ -20,5 +20,8 @@ describe('demo dataset', () => {
     expect(d.submissions.find((s) => s.unitId === 'SSP' && s.version === 2)).toBeTruthy();
     expect(d.personnel.filter((p) => p.name === 'Daniel Tan')).toHaveLength(1);
     expect(new Set(d.personnel.map((p) => p.name)).size).toBe(312);
+    expect(d.personnel.filter((p) => p.unitId === 'COY1').every((p) => p.platoonId?.startsWith('COY1-'))).toBe(true);
+    expect(d.personnel.filter((p) => p.unitId === 'S1').every((p) => p.platoonId === null)).toBe(true);
+    expect(d.personnel.filter((p) => p.platoonId === 'COY1-HQ')).toHaveLength(8);
   });
 });

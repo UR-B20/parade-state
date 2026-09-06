@@ -22,6 +22,8 @@ import { SkeletonRows, SkeletonSummary } from '../../components/Skeleton';
 import { StatusPill } from '../../components/StatusPill';
 import { StatusSheet } from '../../components/StatusSheet';
 import { StrengthSummary } from '../../components/StrengthSummary';
+import { ALL_PLATOONS, NO_PLATOON, PlatoonBreakdown, PlatoonPicker } from '../../components/PlatoonPicker';
+import { unitCounts } from '@shared/domain';
 import { SubmitFooter } from '../../components/SubmitFooter';
 import { useToast } from '../../components/Toast';
 import '../pages.css';
@@ -70,6 +72,10 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<RollFilter>('ALL');
+  const platoonParam = params.get('platoon') ?? ALL_PLATOONS;
+  const hasPlatoons = (data?.platoons.length ?? 0) > 0;
+  const platoon = hasPlatoons ? platoonParam : ALL_PLATOONS;
+  const setPlatoon = (id: string) => setParam('platoon', id === ALL_PLATOONS ? null : id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetNotPresent, setSheetNotPresent] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -79,8 +85,15 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
     setSelectedId(null);
   }, [eventId]);
 
-  const persons = data?.persons ?? [];
-  const selected = selectedId ? persons.find((p) => p.personId === selectedId) ?? null : null;
+  const allPersons = data?.persons ?? [];
+  const persons = useMemo(() => {
+    if (platoon === ALL_PLATOONS) return allPersons;
+    if (platoon === NO_PLATOON) return allPersons.filter((p) => !p.platoonId || !data?.unit.platoons.some((pl) => pl.id === p.platoonId));
+    return allPersons.filter((p) => p.platoonId === platoon);
+  }, [allPersons, platoon, data?.unit.platoons]);
+  const scopeCounts = useMemo(() => (platoon === ALL_PLATOONS ? data?.counts : unitCounts(persons)), [platoon, data?.counts, persons]);
+  const scopeLabel = platoon === ALL_PLATOONS ? null : platoon === NO_PLATOON ? 'Unassigned' : data?.unit.platoons.find((p) => p.id === platoon)?.name ?? null;
+  const selected = selectedId ? allPersons.find((p) => p.personId === selectedId) ?? null : null;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -208,24 +221,33 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
       {data?.locked && me.user.role !== 'ADMIN' && <LockedDateNotice date={formatSgDateLong(date)} />}
 
       <main className="page__content">
-        {data ? (
+        {data && scopeCounts ? (
           <StrengthSummary
-            counts={data.counts}
+            counts={scopeCounts}
+            label={scopeLabel ? `${scopeLabel} present` : 'Present strength'}
             report={reportPill}
             cutoff={cutoff}
-            note={data.counts.unmarked > 0 ? `${data.counts.unmarked} not yet marked. Tap Present or Not present on each row.` : 'Everyone is marked.'}
+            note={
+              scopeLabel
+                ? `${scopeLabel} · ${scopeCounts.unmarked > 0 ? `${scopeCounts.unmarked} not yet marked` : 'everyone marked'} · unit total ${data.counts.present} / ${data.counts.strength}`
+                : data.counts.unmarked > 0
+                  ? `${data.counts.unmarked} not yet marked. Tap Present or Not present on each row.`
+                  : 'Everyone is marked.'
+            }
+            extra={platoon === ALL_PLATOONS ? <PlatoonBreakdown platoons={data.platoons} onSelect={setPlatoon} /> : null}
           />
         ) : (
           <SkeletonSummary />
         )}
 
+        {data && <PlatoonPicker platoons={data.platoons} selected={platoon} onChange={setPlatoon} strength={data.counts.strength} />}
         <SearchField value={search} onChange={setSearch} />
         <FilterChips
           filter={filter}
           onChange={setFilter}
-          total={data?.counts.strength ?? 0}
-          absent={data?.counts.absent ?? 0}
-          unmarked={data?.counts.unmarked ?? 0}
+          total={scopeCounts?.strength ?? 0}
+          absent={scopeCounts?.absent ?? 0}
+          unmarked={scopeCounts?.unmarked ?? 0}
         />
 
         {attendanceQ.isPending ? (
@@ -237,7 +259,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
             text={attendanceQ.error instanceof ApiError ? attendanceQ.error.message : 'Check your connection and try again.'}
             action={<Button onClick={() => attendanceQ.refetch()}>Try again</Button>}
           />
-        ) : persons.length === 0 ? (
+        ) : allPersons.length === 0 ? (
           <EmptyState
             title="No personnel on the roll"
             text="Add your unit's personnel to start marking attendance."

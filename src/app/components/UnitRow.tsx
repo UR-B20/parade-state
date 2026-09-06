@@ -4,6 +4,7 @@ import { STATUS_LABEL, STATUSES, type Status } from '@shared/statuses';
 import type { UnitCounts, UnitSummaryRow } from '@shared/types';
 import { Icon } from './Icon';
 import { SubmissionChip, submissionNote } from './SubmissionChip';
+import { PlatoonBreakdown } from './PlatoonPicker';
 import './Admin.css';
 
 function countFor(counts: UnitCounts, status: Status): number {
@@ -47,13 +48,14 @@ export function UnitRow({ row, eventId, date }: { row: UnitSummaryRow; eventId: 
         </span>
         <span className="unit__state">
           <SubmissionChip state={row.submission} />
-          {row.counts.unmarked > 0 ? <span className="truncate num">{row.counts.unmarked} not yet marked</span> : note && <span className="truncate">{note}</span>}
+          {row.counts.unmarked > 0 ? <span className="truncate num">{row.counts.unmarked} to mark</span> : note && <span className="truncate">{note}</span>}
         </span>
         <Icon name="chevronDown" className="unit__caret" />
       </button>
       {open && (
         <div id={detailId} className="unit__detail">
           <CountGrid counts={row.counts} />
+          <PlatoonBreakdown platoons={row.platoons} />
           <div className="unit__links">
             <span className="num">
               {row.counts.unmarked > 0 ? `${row.counts.unmarked} not yet marked` : 'Everyone marked'}
