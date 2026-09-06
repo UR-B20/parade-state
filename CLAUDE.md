@@ -133,8 +133,9 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   the battalion summary/absentees/trends load everything in five queries (`unitRows` in
   `src/worker/services/summary.ts`); keep new admin endpoints batched the same way. (3) Smart
   Placement is on in `wrangler.jsonc`. (4) In this remote environment a headless browser cannot
-  reach any external site through the proxy, so live checks are API-level: see the pattern in
-  the go-live doc (Node fetch with `NODE_USE_ENV_PROXY=1`, `connection: close`, retries).
+  reach any external site through the proxy, so live checks are API-level: `scripts/live-check.mjs`
+  (Node fetch with `NODE_USE_ENV_PROXY=1`, `connection: close`, retries; `--cleanup` removes
+  the throwaway data).
 - Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.

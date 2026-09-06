@@ -44,8 +44,8 @@ build (`pnpm db:migrate && pnpm build`), which reaches the session pooler direct
 2. Read-only checks over HTTPS with the secret key: PostgREST root lists the tables; `units`
    has 8 rows and `platoons` 11; `profiles` and `personnel` are empty.
 3. Live checks are API-level, because the remote environment's headless browser cannot reach
-   external sites through the proxy. A Node script (scratchpad, not committed; run with
-   `NODE_USE_ENV_PROXY=1`, `connection: close` headers, retries with a 30 s abort) does: Set up
+   external sites through the proxy. `scripts/live-check.mjs` (run with `NODE_USE_ENV_PROXY=1`, it uses
+   `connection: close` headers and retries with a 30 s abort) does: Set up
    SoldierTrack with a throwaway admin + setup key → empty Overview; create a throwaway Coy 1
    commander → sign in → forced password change; add two people (one in Platoon 1); mark one
    Present, one MC; Submit to S1; as S1 check Units, Absentees, the notification (Realtime),
