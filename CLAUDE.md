@@ -126,6 +126,15 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   reset to it (the parallel work is kept at `archive/parallel-main-2026-09-06`, never merge
   it) and the other session was archived. `main` now tracks this branch; fast-forward it from
   the branch when the owner wants a deploy, never the other way round.
+- Live findings (6 Sep, evening): (1) postgres.js with `max: 1` pipelines concurrent
+  queries and Supabase's transaction pooler never answers them, so any request with a
+  `Promise.all` of queries hung; `max` is now 6 (`src/worker/db/client.ts`). Keep it above
+  the largest concurrent batch. (2) The Worker sits one round trip from Postgres per query;
+  the battalion summary/absentees/trends load everything in five queries (`unitRows` in
+  `src/worker/services/summary.ts`); keep new admin endpoints batched the same way. (3) Smart
+  Placement is on in `wrangler.jsonc`. (4) In this remote environment a headless browser cannot
+  reach any external site through the proxy, so live checks are API-level: see the pattern in
+  the go-live doc (Node fetch with `NODE_USE_ENV_PROXY=1`, `connection: close`, retries).
 - Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.
