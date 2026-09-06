@@ -145,6 +145,10 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   bound in `wrangler.jsonc`; `/api/admin/health` (admin-only) times each database step.
   `scripts/live-check.mjs` marks reads whose responses never arrive as UNVERIFIED and always
   cleans up; the definitive check of the S1 screens is the owner's own browser in Singapore.
+- Live check on 6 Sep 20:00Z: 20 of 27 checks passed, the other 7 (S1 summary, absentees,
+  trends, exports) could not be received on this network but are successes in Worker logs.
+  Throwaway data removed; `needsBootstrap` true. Owner still to do: disable legacy Supabase
+  keys, real first sign-in, browser pass of the S1 screens.
 - Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.

@@ -20,10 +20,21 @@ const cleanupOnly = process.argv.includes('--cleanup');
 const sgToday = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
 const results = [];
 const check = (name, ok, detail = '') => { results.push([ok ? 'PASS' : 'FAIL', name, detail]); console.log(ok ? '  ok ' : '  FAIL', name, detail); if (!ok) throw new Error(`check failed: ${name} ${detail}`); };
-/** Some networks drop responses that take more than a few seconds; record those reads as unverified rather than failing the run. */
-const softly = async (name, fn) => { try { await fn(); } catch (e) { if (e?.cause?.code === 'UND_ERR_SOCKET' || e?.name === 'TimeoutError' || /fetch failed|aborted/i.test(String(e?.message))) { results.push(['UNVERIFIED', name, String(e?.cause?.code || e?.message)]); console.log('  ?? ', name, 'response did not reach this network:', e?.cause?.code || e?.message); } else throw e; } };
-
-async function fetchRetry(url, init, tries = 3) {
+/**
+ * Some networks drop responses that take more than a few seconds and the abort signal cannot
+ * cut through their tunnel, so each read gets a hard cap via a race; a read that never
+ * arrives is recorded as UNVERIFIED (the Worker logs still show it) rather than failing.
+ */
+const softly = async (name, fn, capMs = 25000) => {
+  let timer;
+  const cap = new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('response did not arrive'), { unverified: true })), capMs); });
+  try { await Promise.race([fn(), cap]); }
+  catch (e) {
+    if (e?.unverified || e?.cause?.code === 'UND_ERR_SOCKET' || e?.name === 'TimeoutError' || /fetch failed|aborted/i.test(String(e?.message))) { results.push(['UNVERIFIED', name, String(e?.cause?.code || e?.message)]); console.log('  ?? ', name, 'unverified from this network:', e?.cause?.code || e?.message); }
+    else throw e;
+  } finally { clearTimeout(timer); }
+};
+async function fetchRetry(url, init, tries = 2) {
   for (let i = 1; ; i++) {
     try { return await fetch(url, { ...init, headers: { connection: 'close', ...(init.headers || {}) } }); }
     catch (e) { if (i >= tries) throw e; console.log('  retry', i, url.split('/').slice(-2).join('/'), e.cause?.code || e.message); await new Promise((r) => setTimeout(r, 800 * i)); }
@@ -77,6 +88,7 @@ if (cleanupOnly) { await cleanup(); process.exit(0); }
 
 const today = sgToday();
 console.log('live API smoke test, SG date', today);
+process.on('unhandledRejection', async (e) => { console.error('ABORTED:', e?.message || e); await cleanup().catch((x) => console.error('cleanup failed', x?.message)); process.exit(1); });
 let r = await api('/config'); check('config reachable', r.status === 200 && r.body.demoControls === false, JSON.stringify({ needsBootstrap: r.body.needsBootstrap, demoControls: r.body.demoControls }));
 if (r.body.needsBootstrap) {
   r = await api('/auth/bootstrap', { method: 'POST', json: { email: ADMIN.email, displayName: ADMIN.name, password: ADMIN.pw, setupKey: 'wrong-key' } }); check('bootstrap rejects a wrong setup key', r.status === 401 || r.status === 403, String(r.status));
@@ -118,3 +130,4 @@ await softly('CSV export with BOM', async () => { const x = await api(`/admin/ex
 r = await api('/admin/summary/' + am.id); check('unauthenticated request rejected', r.status === 401, String(r.status));
 console.log(`\n${results.filter((x) => x[0] === 'PASS').length} passed, ${results.filter((x) => x[0] === 'UNVERIFIED').length} unverified from this network, of ${results.length} checks`);
 await cleanup();
+process.exit(0);

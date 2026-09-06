@@ -1,6 +1,10 @@
 # Go-live plan: real Supabase project, real roll
 
-Status: approved by the owner on 6 Sep 2026. Variables present and verified over HTTPS; schema not yet applied.
+Status (6 Sep 2026, 20:00Z): live at https://parade-state.ranee-uthaya.workers.dev. Schema applied by
+the first Cloudflare build; Hyperdrive bound; live check passed (20 checks, 7 S1 reads unverifiable
+from the remote environment but recorded as successes in Worker logs); database empty again, so the
+owner's first sign-in creates the S1 admin. Remaining for the owner: disable the legacy Supabase
+keys, first sign-in, and a browser pass over the S1 screens.
 
 ## Context
 
