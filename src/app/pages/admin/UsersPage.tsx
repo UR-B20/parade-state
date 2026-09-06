@@ -104,6 +104,8 @@ export function UsersPage() {
       <UserSheet
         user={editing}
         units={unitsQ.data ?? []}
+        unitsState={unitsQ.isError ? 'error' : unitsQ.data ? 'ready' : 'loading'}
+        onRetryUnits={() => unitsQ.refetch()}
         selfId={me.user.id}
         busy={create.isPending || update.isPending || reset.isPending}
         onClose={() => setEditing(null)}
@@ -119,6 +121,8 @@ export function UsersPage() {
 interface UserSheetProps {
   user: UserDto | 'new' | null;
   units: UnitDto[];
+  unitsState: 'loading' | 'ready' | 'error';
+  onRetryUnits: () => void;
   selfId: string;
   busy: boolean;
   onClose: () => void;
@@ -127,7 +131,7 @@ interface UserSheetProps {
   onReset: (id: string, password: string) => void;
 }
 
-function UserSheet({ user, units, selfId, busy, onClose, onCreate, onUpdate, onReset }: UserSheetProps) {
+function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClose, onCreate, onUpdate, onReset }: UserSheetProps) {
   const isNew = user === 'new';
   const existing = user && user !== 'new' ? user : null;
   const [key, setKey] = useState<string | null>(null);
@@ -210,9 +214,17 @@ function UserSheet({ user, units, selfId, busy, onClose, onCreate, onUpdate, onR
       {(isNew ? role === 'COMMANDER' : existing?.role === 'COMMANDER') && (
         <label className="field">
           <span className="field__label">Unit</span>
-          <select className="field__input" value={unitId} onChange={(e) => setUnitId(e.target.value)}>
-            {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
+          {units.length > 0 ? (
+            <select className="field__input" value={units.some((u) => u.id === unitId) ? unitId : units[0]!.id} onChange={(e) => setUnitId(e.target.value)}>
+              {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          ) : unitsState === 'error' ? (
+            <span className="field__error" role="alert">
+              Couldn't load the units. <button type="button" className="btn btn--ghost btn--small" onClick={onRetryUnits}>Try again</button>
+            </span>
+          ) : (
+            <span className="field__hint" aria-live="polite">Loading units…</span>
+          )}
         </label>
       )}
       {isNew && (
