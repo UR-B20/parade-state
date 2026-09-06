@@ -10,6 +10,7 @@ export interface RollPerson {
   name: string;
   postedInDate: IsoDate;
   postedOutDate: IsoDate | null;
+  platoonId?: string | null;
 }
 
 /** An absence span as stored; only active (non-superseded) spans should be passed in. */
@@ -34,7 +35,7 @@ export function spanCovers(span: SpanRow, date: IsoDate): boolean {
 
 /**
  * Derive each person's status for one event.
- * Precedence: confirmed Present mark for this event > newest covering span > default Present.
+ * Precedence: Present mark for this event > newest covering span > UNMARKED.
  * Persons not active on the event date are excluded.
  */
 export function effectiveStatuses(
@@ -53,9 +54,9 @@ export function effectiveStatuses(
   const result: EffectiveStatus[] = [];
   for (const person of persons) {
     if (!isActiveOn(person, eventDate)) continue;
-    const base = { personId: person.id, rank: person.rank, name: person.name };
+    const base = { personId: person.id, rank: person.rank, name: person.name, platoonId: person.platoonId ?? null };
     if (presentMarks.has(person.id)) {
-      result.push({ ...base, status: 'PRESENT', confirmed: true, subType: null, startDate: null, endDate: null, remark: null, spanId: null });
+      result.push({ ...base, status: 'PRESENT', subType: null, startDate: null, endDate: null, remark: null, spanId: null });
       continue;
     }
     const span = coveringByPerson.get(person.id);
@@ -63,7 +64,6 @@ export function effectiveStatuses(
       result.push({
         ...base,
         status: span.status,
-        confirmed: true,
         subType: span.subType,
         startDate: span.startDate,
         endDate: span.endDate,
@@ -72,7 +72,7 @@ export function effectiveStatuses(
       });
       continue;
     }
-    result.push({ ...base, status: 'PRESENT', confirmed: false, subType: null, startDate: null, endDate: null, remark: null, spanId: null });
+    result.push({ ...base, status: 'UNMARKED', subType: null, startDate: null, endDate: null, remark: null, spanId: null });
   }
   result.sort(compareByRankThenName);
   return result;

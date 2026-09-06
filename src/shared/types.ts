@@ -1,14 +1,23 @@
-import type { AbsenceStatus, OthersSubType, Status } from './statuses';
+import type { AbsenceStatus, EffectiveKind, OthersSubType } from './statuses';
 import type { IsoDate, IsoTimestamp } from './dates';
 
 export type UnitId = 'S1' | 'S2' | 'S3' | 'S4' | 'SSP' | 'COY1' | 'COY2' | 'ISR';
 export type Role = 'ADMIN' | 'COMMANDER';
 export type EventType = 'AM' | 'PM' | 'ADHOC';
 
+export interface PlatoonDto {
+  id: string;
+  unitId: UnitId;
+  name: string;
+  sortOrder: number;
+}
+
 export interface UnitDto {
   id: UnitId;
   name: string;
   sortOrder: number;
+  /** Sub-units, in display order. Empty for staff units. */
+  platoons: PlatoonDto[];
 }
 
 export interface UserDto {
@@ -43,46 +52,6 @@ export interface ConfigDto {
   needsBootstrap: boolean;
 }
 
-/** Creates the first S1 admin on an empty database. */
-export interface BootstrapBody {
-  email: string;
-  displayName: string;
-  /** Must equal the Worker's BOOTSTRAP_ADMIN_PASSWORD secret; becomes the admin's first password. */
-  bootstrapPassword: string;
-}
-
-export interface ChangePasswordBody {
-  newPassword: string;
-}
-
-export interface CreateUserBody {
-  email: string;
-  displayName: string;
-  role: Role;
-  /** Required for commanders, must be omitted for admins. */
-  unitId?: UnitId | null;
-  /** The user signs in with this once and is then made to change it. */
-  temporaryPassword: string;
-}
-
-export interface ResetPasswordBody {
-  temporaryPassword: string;
-}
-
-export interface UsersDto {
-  users: UserDto[];
-}
-
-export interface UnitsDto {
-  units: UnitDto[];
-}
-
-export interface RollDto {
-  unit: UnitDto;
-  date: IsoDate;
-  persons: PersonDto[];
-}
-
 export interface EventDto {
   id: string;
   date: IsoDate;
@@ -97,6 +66,7 @@ export interface EventDto {
 export interface PersonDto {
   id: string;
   unitId: UnitId;
+  platoonId: string | null;
   rank: string;
   name: string;
   serviceNo: string | null;
@@ -104,17 +74,17 @@ export interface PersonDto {
   postedOutDate: IsoDate | null;
 }
 
-/** A person's status for one event, as derived by the server. */
+/**
+ * A person's status for one event, as derived by the server. Present is always an explicit
+ * mark; a person with no mark and no covering absence is UNMARKED and counts in neither
+ * present nor absent.
+ */
 export interface EffectiveStatus {
   personId: string;
   rank: string;
   name: string;
-  status: Status;
-  /**
-   * False only for the default Present of an unmarked person. The UI must show
-   * this as default attendance, not as a confirmed mark.
-   */
-  confirmed: boolean;
+  platoonId: string | null;
+  status: EffectiveKind;
   subType: OthersSubType | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;
@@ -125,9 +95,10 @@ export interface EffectiveStatus {
 
 export interface UnitCounts {
   strength: number;
+  /** Explicitly marked Present. */
   present: number;
-  presentConfirmed: number;
-  presentDefault: number;
+  /** Neither marked Present nor covered by an absence. */
+  unmarked: number;
   mc: number;
   ll: number;
   ma: number;
@@ -152,7 +123,7 @@ export type SubmissionState =
 export type SubmissionKind = SubmissionState['kind'];
 
 export interface StatusTuple {
-  status: Status;
+  status: EffectiveKind;
   subType: OthersSubType | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;
@@ -169,11 +140,19 @@ export interface ChangeDiff {
   after: StatusTuple | null;
 }
 
+/** Counts for one platoon; `platoon` is null for personnel without a platoon in a unit that has them. */
+export interface PlatoonCounts {
+  platoon: PlatoonDto | null;
+  counts: UnitCounts;
+}
+
 export interface UnitAttendanceDto {
   unit: UnitDto;
   event: EventDto;
   persons: EffectiveStatus[];
   counts: UnitCounts;
+  /** Per-platoon breakdown; empty for units without platoons. */
+  platoons: PlatoonCounts[];
   submission: SubmissionState;
   changes: ChangeDiff[];
   /** Last change to this unit's attendance for this event. */
@@ -204,16 +183,6 @@ export type MarkBody =
       remark?: string | null;
     };
 
-export interface EventsDto {
-  date: IsoDate;
-  events: EventDto[];
-}
-
-export interface SubmitBody {
-  /** The hash the commander reviewed; the server refuses to submit if the roll changed since. */
-  contentHash?: string;
-}
-
 export interface SubmissionDto {
   id: string;
   unitId: UnitId;
@@ -226,19 +195,11 @@ export interface SubmissionDto {
   contentHash: string;
 }
 
-export interface SubmissionsDto {
-  submissions: SubmissionDto[];
-}
-
-export interface SubmitResultDto {
-  submission: SubmissionDto;
-  attendance: UnitAttendanceDto;
-}
-
 export interface UnitSummaryRow {
   unit: UnitDto;
   counts: UnitCounts;
   submission: SubmissionState;
+  platoons: PlatoonCounts[];
 }
 
 export interface BattalionSummaryDto {
@@ -307,9 +268,40 @@ export interface ApiErrorBody {
       | 'NOT_FOUND'
       | 'CONFLICT'
       | 'DATE_LOCKED'
-      | 'PASSWORD_CHANGE_REQUIRED'
       | 'INTERNAL';
     message: string;
     details?: unknown;
   };
+}
+
+/** One day in the battalion trend. Past days come from submissions; the event day is live. */
+export interface TrendDay {
+  date: IsoDate;
+  eventId: string | null;
+  live: boolean;
+  /** Counts over the strength covered: the whole battalion today, submitted units on past days. */
+  counts: UnitCounts;
+  unitsSubmitted: number;
+  unitsTotal: number;
+  onTime: number;
+  late: number;
+}
+
+export interface UnitTimeliness {
+  unitId: string;
+  unitName: string;
+  onTime: number;
+  late: number;
+  missed: number;
+  /** Today only: not submitted yet. */
+  pending: number;
+}
+
+export interface TrendsDto {
+  event: EventDto;
+  days: TrendDay[];
+  units: UnitTimeliness[];
+  /** Today's Others absentees by sub-type. */
+  othersSubTypes: Record<OthersSubType, number>;
+  serverNow: IsoTimestamp;
 }

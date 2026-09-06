@@ -1,28 +1,31 @@
-import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import postgres, { type Sql } from 'postgres';
-import { databaseConnectionString, type Bindings } from '../env';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import type { Bindings } from '../env';
+import { ConfigError } from '../errors';
 import * as schema from './schema';
 
-export type Database = PostgresJsDatabase<typeof schema>;
+export { schema };
 
-type DbBindings = Pick<Bindings, 'HYPERDRIVE' | 'SUPABASE_DB_URL'>;
+/** Any Drizzle Postgres database (postgres.js in the Worker, PGlite in tests) or a transaction on one. */
+export type Db = PgDatabase<PgQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>;
+
+export interface DbHandle {
+  db: Db;
+  /** Release the connection at the end of the request. */
+  close: () => Promise<void>;
+}
 
 /**
- * Open a connection for one Worker invocation. Call `sql.end()` (via `ctx.waitUntil`) when the
- * request finishes; Workers do not keep connections between invocations.
+ * One short-lived connection per request. Hyperdrive (when bound) pools and keeps the TLS
+ * session warm; otherwise we connect straight to Supabase's transaction-mode pooler, which
+ * requires prepared statements to be off.
  */
-export function connect(env: DbBindings): { sql: Sql; db: Database } {
-  const url = databaseConnectionString(env);
-  if (!url) throw new Error('Database is not configured: bind HYPERDRIVE or set SUPABASE_DB_URL');
-  const sql = postgres(url, {
-    // Supabase's transaction-mode pooler (port 6543) and Hyperdrive reject prepared statements.
-    prepare: false,
-    // Skip the type-fetch round trip on connect; only built-in Postgres types are used.
-    fetch_types: false,
-    // A single invocation needs very few connections; the pooler multiplexes across isolates.
-    max: 5,
-    idle_timeout: 20,
-    connect_timeout: 10,
-  });
-  return { sql, db: drizzle(sql, { schema }) };
+export function connectDb(env: Bindings): DbHandle {
+  const url = env.HYPERDRIVE?.connectionString ?? env.SUPABASE_DB_URL;
+  if (!url) throw new ConfigError('set the SUPABASE_DB_URL secret or bind HYPERDRIVE');
+  const sql = postgres(url, { prepare: false, max: 1, fetch_types: false, idle_timeout: 10, connect_timeout: 10 });
+  const db = drizzle(sql, { schema, casing: 'snake_case' });
+  return { db, close: () => sql.end({ timeout: 2 }) };
 }

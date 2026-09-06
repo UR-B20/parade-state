@@ -5,7 +5,7 @@
  */
 import { addDays, sgLocalToIso, type IsoDate, type IsoTimestamp } from '../dates';
 import type { AbsenceStatus, OthersSubType } from '../statuses';
-import type { NotificationType, Role, UnitDto, UnitId } from '../types';
+import type { NotificationType, PlatoonDto, Role, UnitDto, UnitId } from '../types';
 import { contentHash, toSnapshot, type SnapshotEntry } from '../domain/canonical';
 import { effectiveStatuses, type RollPerson, type SpanRow } from '../domain/effectiveStatus';
 import { unitCounts } from '../domain/counts';
@@ -17,15 +17,32 @@ export const DEMO_NOW: IsoTimestamp = sgLocalToIso(DEMO_DATE, '09:24');
 export const DEMO_PASSWORD = 'demo1234';
 export const DEMO_EMAIL_DOMAIN = 'parade-state.demo';
 
+/** Companies are organised into platoons plus a HQ element; staff units are not. */
+export const DEMO_PLATOONS: PlatoonDto[] = [
+  { id: 'COY1-HQ', unitId: 'COY1', name: 'Coy HQ', sortOrder: 0 },
+  { id: 'COY1-P1', unitId: 'COY1', name: 'Platoon 1', sortOrder: 1 },
+  { id: 'COY1-P2', unitId: 'COY1', name: 'Platoon 2', sortOrder: 2 },
+  { id: 'COY1-P3', unitId: 'COY1', name: 'Platoon 3', sortOrder: 3 },
+  { id: 'COY2-HQ', unitId: 'COY2', name: 'Coy HQ', sortOrder: 0 },
+  { id: 'COY2-P1', unitId: 'COY2', name: 'Platoon 1', sortOrder: 1 },
+  { id: 'COY2-P2', unitId: 'COY2', name: 'Platoon 2', sortOrder: 2 },
+  { id: 'COY2-P3', unitId: 'COY2', name: 'Platoon 3', sortOrder: 3 },
+  { id: 'ISR-HQ', unitId: 'ISR', name: 'Coy HQ', sortOrder: 0 },
+  { id: 'ISR-P1', unitId: 'ISR', name: 'Platoon 1', sortOrder: 1 },
+  { id: 'ISR-P2', unitId: 'ISR', name: 'Platoon 2', sortOrder: 2 },
+];
+
+const platoonsOf = (unitId: UnitId) => DEMO_PLATOONS.filter((p) => p.unitId === unitId);
+
 export const DEMO_UNITS: UnitDto[] = [
-  { id: 'S1', name: 'S1', sortOrder: 1 },
-  { id: 'S2', name: 'S2', sortOrder: 2 },
-  { id: 'S3', name: 'S3', sortOrder: 3 },
-  { id: 'S4', name: 'S4', sortOrder: 4 },
-  { id: 'SSP', name: 'SSP', sortOrder: 5 },
-  { id: 'COY1', name: 'Coy 1', sortOrder: 6 },
-  { id: 'COY2', name: 'Coy 2', sortOrder: 7 },
-  { id: 'ISR', name: 'ISR Coy', sortOrder: 8 },
+  { id: 'S1', name: 'S1', sortOrder: 1, platoons: [] },
+  { id: 'S2', name: 'S2', sortOrder: 2, platoons: [] },
+  { id: 'S3', name: 'S3', sortOrder: 3, platoons: [] },
+  { id: 'S4', name: 'S4', sortOrder: 4, platoons: [] },
+  { id: 'SSP', name: 'SSP', sortOrder: 5, platoons: [] },
+  { id: 'COY1', name: 'Coy 1', sortOrder: 6, platoons: platoonsOf('COY1') },
+  { id: 'COY2', name: 'Coy 2', sortOrder: 7, platoons: platoonsOf('COY2') },
+  { id: 'ISR', name: 'ISR Coy', sortOrder: 8, platoons: platoonsOf('ISR') },
 ];
 
 interface UnitSpec {
@@ -60,6 +77,7 @@ export interface DemoUser {
 
 export interface DemoPerson extends RollPerson {
   unitId: UnitId;
+  platoonId: string | null;
   serviceNo: string | null;
 }
 
@@ -119,6 +137,7 @@ export interface DemoDataset {
   date: IsoDate;
   now: IsoTimestamp;
   units: UnitDto[];
+  platoons: PlatoonDto[];
   users: DemoUser[];
   personnel: DemoPerson[];
   events: DemoEvent[];
@@ -231,10 +250,42 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
       else rankPool.pop();
     }
     for (const f of fixed) {
-      unitPeople.push({ id: rng.uuid(), unitId: spec.id, rank: f.rank, name: f.name, serviceNo: null, postedInDate: addDays(date, -rng.int(60, 700)), postedOutDate: null });
+      unitPeople.push({ id: rng.uuid(), unitId: spec.id, platoonId: null, rank: f.rank, name: f.name, serviceNo: null, postedInDate: addDays(date, -rng.int(60, 700)), postedOutDate: null });
     }
     for (const rank of rankPool) {
-      unitPeople.push({ id: rng.uuid(), unitId: spec.id, rank, name: randomName(rng, usedNames), serviceNo: null, postedInDate: addDays(date, -rng.int(30, 900)), postedOutDate: null });
+      unitPeople.push({ id: rng.uuid(), unitId: spec.id, platoonId: null, rank, name: randomName(rng, usedNames), serviceNo: null, postedInDate: addDays(date, -rng.int(30, 900)), postedOutDate: null });
+    }
+    // Companies: HQ element takes the OC, 2IC, CSM, CQMS and a few others; the rest fill the platoons evenly.
+    const unitPlatoons = platoonsOf(spec.id);
+    if (unitPlatoons.length > 0) {
+      const hq = unitPlatoons.find((p) => p.name === 'Coy HQ')!;
+      const line = unitPlatoons.filter((p) => p !== hq);
+      const fixedNamesSet = new Set(fixed.map((f) => f.name));
+      const hqRanks = new Set(['CPT', 'LTA', '2WO', '1SG', 'MAJ']);
+      const hqFill = ['2SG', 'CPL', 'LCP'];
+      let hqLeft = 8;
+      for (const p of unitPeople) {
+        if (hqLeft > 0 && hqRanks.has(p.rank) && !fixedNamesSet.has(p.name)) {
+          p.platoonId = hq.id;
+          hqLeft -= 1;
+        }
+      }
+      for (const rank of hqFill) {
+        for (const p of unitPeople) {
+          if (hqLeft > 0 && !p.platoonId && p.rank === rank && !fixedNamesSet.has(p.name)) {
+            p.platoonId = hq.id;
+            hqLeft -= 1;
+          }
+        }
+      }
+      let i = 0;
+      for (const p of unitPeople) {
+        if (p.platoonId) continue;
+        p.platoonId = line[i % line.length]!.id;
+        i += 1;
+      }
+      // The brief's example rows all sit in Platoon 1.
+      for (const f of fixed) unitPeople.find((p) => p.name === f.name)!.platoonId = line[0]!.id;
     }
     personnel.push(...unitPeople);
 
@@ -268,11 +319,14 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
       addSpan(take(), 'OTHERS', subType, addDays(date, -rng.int(0, 6)), addDays(date, rng.int(3, 14)), rng.pick(OTHERS_REMARKS[subType]));
     }
 
-    // Confirmed Present marks for the AM parade.
+    // Present marks for the AM parade. Submitted units are fully marked; S2 has not started;
+    // Coy 1 (pending) still has ten people to mark, which shows the blocked-submit state.
     const presentPeople = unitPeople.filter((p) => !absentIds.has(p.id));
-    const confirmShare = spec.id === 'S2' ? 0 : spec.id === 'COY1' ? 0.6 : 0.97;
+    const fixedNames = new Set(fixed.map((f) => f.name));
+    const leaveUnmarked = spec.id === 'S2' ? presentPeople.length : spec.id === 'COY1' ? 10 : 0;
+    const unmarkedIds = new Set(rng.shuffle(presentPeople.filter((p) => !fixedNames.has(p.name))).slice(0, leaveUnmarked).map((p) => p.id));
     for (const p of presentPeople) {
-      if (rng.next() < confirmShare) {
+      if (!unmarkedIds.has(p.id)) {
         marks.push({ eventId: am.id, personId: p.id, unitId: spec.id, markedBy: commander.id, markedAt: sgLocalToIso(date, `0${rng.int(7, 8)}:${String(rng.int(10, 59))}`) });
       }
     }
@@ -323,5 +377,56 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
   }
   notifications.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
-  return { date, now: DEMO_NOW, units: DEMO_UNITS, users, personnel, events, spans, marks, unitEventState, submissions, notifications };
+  // ---- History: the AM parades of the 13 days before the demo day, so trends and reporting
+  // discipline have something to show. Generated last so the demo day's figures stay exactly
+  // as the brief describes them. Absences are real spans that ended before the demo day.
+  const HISTORY_DAYS = 13;
+  // Days (counted back from the demo day) with heavier absence: Tue 1 Sep after a battalion
+  // exercise (report-sick spike), and two milder bumps.
+  const heavyDays: Record<number, number> = { 5: 2.1, 12: 1.4, 3: 1.25 };
+  const missedDays: Partial<Record<UnitId, number[]>> = { S2: [3, 9] };
+  const lateDays: Partial<Record<UnitId, number[]>> = { COY2: [2, 6, 11], S4: [9] };
+  const lastPast = addDays(date, -1);
+  const minute = () => String(rng.int(10, 59));
+  for (let back = HISTORY_DAYS; back >= 1; back--) {
+    const d = addDays(date, -back);
+    const ev: DemoEvent = { id: `${d}-AM`, date: d, type: 'AM', cutoffAt: sgLocalToIso(d, '10:00') };
+    events.push(ev);
+    const factor = heavyDays[back] ?? 1;
+    for (const spec of UNIT_SPECS) {
+      const commander = commanderFor.get(spec.id)!;
+      const unitPeople = personnel.filter((p) => p.unitId === spec.id);
+      const unitSpans = () => spans.filter((s) => s.unitId === spec.id);
+      const covered = new Set(effectiveStatuses(unitPeople, unitSpans(), new Set(), d).filter((s) => s.status !== 'UNMARKED').map((s) => s.personId));
+      const baseline = spec.mc + spec.ll + spec.ma + spec.rsi + spec.others;
+      const target = Math.max(0, Math.round(baseline * factor) + rng.int(-1, 1));
+      const pool = rng.shuffle(unitPeople.filter((p) => !covered.has(p.id) && ['PTE', 'LCP', 'CPL', 'CFC', '3SG'].includes(p.rank)));
+      for (let i = 0; i < target - covered.size && i < pool.length; i++) {
+        const person = pool[i]!;
+        const r = rng.next();
+        const status: AbsenceStatus = factor > 1.5
+          ? (r < 0.45 ? 'RSI' : r < 0.7 ? 'MC' : r < 0.85 ? 'MA' : 'LL')
+          : (r < 0.35 ? 'MC' : r < 0.55 ? 'LL' : r < 0.7 ? 'MA' : r < 0.85 ? 'RSI' : 'OTHERS');
+        const subType = status === 'OTHERS' ? rng.pick(['COURSE', 'OUTFIELD', 'ATTACHED_OUT', 'DUTY'] as const) : null;
+        const wanted = addDays(d, status === 'RSI' || status === 'MA' ? 0 : rng.int(0, 2));
+        const end = wanted < lastPast ? wanted : lastPast;
+        const remark = status === 'OTHERS' ? rng.pick(OTHERS_REMARKS[subType!]) : status === 'RSI' ? null : rng.pick(['Medical centre', 'Polyclinic', 'Excuse RMJ']);
+        spans.push({ id: rng.uuid(), personId: person.id, unitId: spec.id, status, subType, startDate: d, endDate: end, remark, createdAt: sgLocalToIso(d, `0${rng.int(7, 8)}:${minute()}`), createdBy: commander.id });
+      }
+      if (missedDays[spec.id]?.includes(back)) continue; // Nothing marked, nothing submitted that day.
+      const marked = new Set<string>();
+      for (const s of effectiveStatuses(unitPeople, unitSpans(), new Set(), d)) {
+        if (s.status !== 'UNMARKED') continue;
+        marks.push({ eventId: ev.id, personId: s.personId, unitId: spec.id, markedBy: commander.id, markedAt: sgLocalToIso(d, `0${rng.int(7, 8)}:${minute()}`) });
+        marked.add(s.personId);
+      }
+      const statuses = effectiveStatuses(unitPeople, unitSpans(), marked, d);
+      const late = lateDays[spec.id]?.includes(back) ?? false;
+      const submittedAt = sgLocalToIso(d, late ? `1${rng.int(0, 1)}:${minute()}` : `0${rng.int(8, 9)}:${minute()}`);
+      unitEventState.push({ unitId: spec.id, eventId: ev.id, firstChangedAt: sgLocalToIso(d, '07:30'), lastChangedAt: submittedAt, lastChangedBy: commander.id });
+      submissions.push({ id: rng.uuid(), unitId: spec.id, eventId: ev.id, version: 1, submittedBy: commander.id, submittedAt, contentHash: await contentHash(statuses), counts: unitCounts(statuses), snapshot: toSnapshot(statuses) });
+    }
+  }
+
+  return { date, now: DEMO_NOW, units: DEMO_UNITS, platoons: DEMO_PLATOONS, users, personnel, events, spans, marks, unitEventState, submissions, notifications };
 }

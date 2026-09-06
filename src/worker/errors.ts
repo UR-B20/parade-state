@@ -11,7 +11,6 @@ const STATUS_FOR: Record<ErrorCode, ContentfulStatusCode> = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   DATE_LOCKED: 403,
-  PASSWORD_CHANGE_REQUIRED: 403,
   INTERNAL: 500,
 };
 
@@ -40,12 +39,23 @@ export const forbidden = (message = 'You do not have access to this unit') => ne
 export const unauthorized = (message = 'Sign in to continue') => new AppError('UNAUTHORIZED', message);
 export const validation = (message: string, details?: unknown) => new AppError('VALIDATION', message, details);
 export const conflict = (message: string) => new AppError('CONFLICT', message);
-export const passwordChangeRequired = () =>
-  new AppError('PASSWORD_CHANGE_REQUIRED', 'Change your password to continue');
+
+/** Missing secrets or bindings. Surfaced plainly so a first deployment is easy to fix. */
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
 
 export function handleError(err: unknown, c: Context): Response {
   if (err instanceof AppError) {
     return c.json(err.toBody(), err.status);
+  }
+  if (err instanceof ConfigError) {
+    console.error('Configuration error', err.message);
+    const body: ApiErrorBody = { error: { code: 'INTERNAL', message: `Server configuration incomplete: ${err.message}` } };
+    return c.json(body, 503);
   }
   console.error('Unhandled error', err);
   const body: ApiErrorBody = {

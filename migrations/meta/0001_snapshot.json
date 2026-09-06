@@ -1,213 +1,32 @@
 {
-  "id": "3e6933a7-12bc-4d03-a75c-5234fa24c680",
-  "prevId": "d128615f-0719-4856-a76f-48496f3fe91f",
+  "id": "60553cae-6b2c-4372-a034-84e1a5e06c07",
+  "prevId": "c70b92e9-2284-4122-a49b-7a65c2c1e389",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.absence_spans": {
-      "name": "absence_spans",
+    "public.app_settings": {
+      "name": "app_settings",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
+        "key": {
+          "name": "key",
+          "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "person_id": {
-          "name": "person_id",
-          "type": "uuid",
-          "primaryKey": false,
           "notNull": true
         },
-        "unit_id": {
-          "name": "unit_id",
+        "value": {
+          "name": "value",
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sub_type": {
-          "name": "sub_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "start_date": {
-          "name": "start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "remark": {
-          "name": "remark",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "superseded_at": {
-          "name": "superseded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "superseded_by": {
-          "name": "superseded_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
-      "indexes": {
-        "absence_spans_person_active_idx": {
-          "name": "absence_spans_person_active_idx",
-          "columns": [
-            {
-              "expression": "person_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "where": "\"absence_spans\".\"superseded_at\" is null",
-          "concurrently": false
-        },
-        "absence_spans_unit_dates_idx": {
-          "name": "absence_spans_unit_dates_idx",
-          "columns": [
-            {
-              "expression": "unit_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "start_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "end_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "where": "\"absence_spans\".\"superseded_at\" is null",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "absence_spans_person_id_personnel_id_fk": {
-          "name": "absence_spans_person_id_personnel_id_fk",
-          "tableFrom": "absence_spans",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "tableTo": "personnel",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "absence_spans_unit_id_units_id_fk": {
-          "name": "absence_spans_unit_id_units_id_fk",
-          "tableFrom": "absence_spans",
-          "columnsFrom": [
-            "unit_id"
-          ],
-          "tableTo": "units",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "absence_spans_created_by_profiles_id_fk": {
-          "name": "absence_spans_created_by_profiles_id_fk",
-          "tableFrom": "absence_spans",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "tableTo": "profiles",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "absence_spans_superseded_by_profiles_id_fk": {
-          "name": "absence_spans_superseded_by_profiles_id_fk",
-          "tableFrom": "absence_spans",
-          "columnsFrom": [
-            "superseded_by"
-          ],
-          "tableTo": "profiles",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "absence_spans_status_check": {
-          "name": "absence_spans_status_check",
-          "value": "\"absence_spans\".\"status\" in ('MC', 'LL', 'MA', 'RSI', 'OTHERS')"
-        },
-        "absence_spans_sub_type_check": {
-          "name": "absence_spans_sub_type_check",
-          "value": "(\"absence_spans\".\"status\" = 'OTHERS' and \"absence_spans\".\"sub_type\" in ('ATTACHED_OUT', 'COURSE', 'OUTFIELD', 'DUTY')) or (\"absence_spans\".\"status\" <> 'OTHERS' and \"absence_spans\".\"sub_type\" is null)"
-        },
-        "absence_spans_dates_check": {
-          "name": "absence_spans_dates_check",
-          "value": "\"absence_spans\".\"end_date\" is null or \"absence_spans\".\"end_date\" >= \"absence_spans\".\"start_date\""
-        },
-        "absence_spans_rsi_single_day_check": {
-          "name": "absence_spans_rsi_single_day_check",
-          "value": "\"absence_spans\".\"status\" <> 'RSI' or \"absence_spans\".\"end_date\" = \"absence_spans\".\"start_date\""
-        },
-        "absence_spans_superseded_check": {
-          "name": "absence_spans_superseded_check",
-          "value": "(\"absence_spans\".\"superseded_at\" is null and \"absence_spans\".\"superseded_by\" is null) or (\"absence_spans\".\"superseded_at\" is not null and \"absence_spans\".\"superseded_by\" is not null)"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.date_unlocks": {
@@ -241,14 +60,106 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "date_unlocks_unlocked_by_profiles_id_fk": {
-          "name": "date_unlocks_unlocked_by_profiles_id_fk",
-          "tableFrom": "date_unlocks",
-          "columnsFrom": [
-            "unlocked_by"
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.event_marks": {
+      "name": "event_marks",
+      "schema": "",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_id": {
+          "name": "unit_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marked_by": {
+          "name": "marked_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marked_at": {
+          "name": "marked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "event_marks_unit_idx": {
+          "name": "event_marks_unit_idx",
+          "columns": [
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "tableTo": "profiles",
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "event_marks_event_id_events_id_fk": {
+          "name": "event_marks_event_id_events_id_fk",
+          "tableFrom": "event_marks",
+          "columnsFrom": [
+            "event_id"
+          ],
+          "tableTo": "events",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "event_marks_person_id_personnel_id_fk": {
+          "name": "event_marks_person_id_personnel_id_fk",
+          "tableFrom": "event_marks",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "tableTo": "personnel",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "event_marks_unit_id_units_id_fk": {
+          "name": "event_marks_unit_id_units_id_fk",
+          "tableFrom": "event_marks",
+          "columnsFrom": [
+            "unit_id"
+          ],
+          "tableTo": "units",
           "columnsTo": [
             "id"
           ],
@@ -256,7 +167,15 @@
           "onDelete": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "event_marks_event_id_person_id_pk": {
+          "name": "event_marks_event_id_person_id_pk",
+          "columns": [
+            "event_id",
+            "person_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -280,7 +199,8 @@
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "event_type",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -296,23 +216,44 @@
           "primaryKey": false,
           "notNull": true
         },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
+        "unit_id": {
+          "name": "unit_id",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": false
         },
         "created_by": {
           "name": "created_by",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
-        "events_date_parade_key": {
-          "name": "events_date_parade_key",
+        "events_date_idx": {
+          "name": "events_date_idx",
+          "columns": [
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "events_standard_unique": {
+          "name": "events_standard_unique",
           "columns": [
             {
               "expression": "date",
@@ -330,33 +271,18 @@
           "isUnique": true,
           "with": {},
           "method": "btree",
-          "where": "\"events\".\"type\" in ('AM', 'PM')",
-          "concurrently": false
-        },
-        "events_date_idx": {
-          "name": "events_date_idx",
-          "columns": [
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
+          "where": "\"events\".\"type\" IN ('AM', 'PM')",
           "concurrently": false
         }
       },
       "foreignKeys": {
-        "events_created_by_profiles_id_fk": {
-          "name": "events_created_by_profiles_id_fk",
+        "events_unit_id_units_id_fk": {
+          "name": "events_unit_id_units_id_fk",
           "tableFrom": "events",
           "columnsFrom": [
-            "created_by"
+            "unit_id"
           ],
-          "tableTo": "profiles",
+          "tableTo": "units",
           "columnsTo": [
             "id"
           ],
@@ -368,13 +294,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "events_type_check": {
-          "name": "events_type_check",
-          "value": "\"events\".\"type\" in ('AM', 'PM', 'ADHOC')"
-        },
-        "events_name_check": {
-          "name": "events_name_check",
-          "value": "(\"events\".\"type\" = 'ADHOC' and \"events\".\"name\" is not null) or (\"events\".\"type\" <> 'ADHOC' and \"events\".\"name\" is null)"
+        "events_adhoc_named": {
+          "name": "events_adhoc_named",
+          "value": "\"events\".\"type\" <> 'ADHOC' OR \"events\".\"name\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false
@@ -398,7 +320,8 @@
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "notification_type",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -441,11 +364,17 @@
         }
       },
       "indexes": {
-        "notifications_user_created_idx": {
-          "name": "notifications_user_created_idx",
+        "notifications_user_idx": {
+          "name": "notifications_user_idx",
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "read_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -462,24 +391,8 @@
           "method": "btree",
           "concurrently": false
         },
-        "notifications_user_unread_idx": {
-          "name": "notifications_user_unread_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "where": "\"notifications\".\"read_at\" is null",
-          "concurrently": false
-        },
-        "notifications_late_once_key": {
-          "name": "notifications_late_once_key",
+        "notifications_late_once": {
+          "name": "notifications_late_once",
           "columns": [
             {
               "expression": "user_id",
@@ -545,31 +458,13 @@
             "id"
           ],
           "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "notifications_submission_id_submissions_id_fk": {
-          "name": "notifications_submission_id_submissions_id_fk",
-          "tableFrom": "notifications",
-          "columnsFrom": [
-            "submission_id"
-          ],
-          "tableTo": "submissions",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "notifications_type_check": {
-          "name": "notifications_type_check",
-          "value": "\"notifications\".\"type\" in ('SUBMITTED', 'RESUBMITTED', 'LATE')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.personnel": {
@@ -619,6 +514,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -640,12 +541,6 @@
           "columns": [
             {
               "expression": "unit_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "posted_in_date",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -682,138 +577,11 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "personnel_posting_check": {
-          "name": "personnel_posting_check",
-          "value": "\"personnel\".\"posted_out_date\" is null or \"personnel\".\"posted_out_date\" > \"personnel\".\"posted_in_date\""
+        "personnel_posting_order": {
+          "name": "personnel_posting_order",
+          "value": "\"personnel\".\"posted_out_date\" IS NULL OR \"personnel\".\"posted_out_date\" >= \"personnel\".\"posted_in_date\""
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.present_marks": {
-      "name": "present_marks",
-      "schema": "",
-      "columns": {
-        "event_id": {
-          "name": "event_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "person_id": {
-          "name": "person_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "unit_id": {
-          "name": "unit_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "marked_by": {
-          "name": "marked_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "marked_at": {
-          "name": "marked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "present_marks_unit_event_idx": {
-          "name": "present_marks_unit_event_idx",
-          "columns": [
-            {
-              "expression": "unit_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "present_marks_event_id_events_id_fk": {
-          "name": "present_marks_event_id_events_id_fk",
-          "tableFrom": "present_marks",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "tableTo": "events",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "present_marks_person_id_personnel_id_fk": {
-          "name": "present_marks_person_id_personnel_id_fk",
-          "tableFrom": "present_marks",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "tableTo": "personnel",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "present_marks_unit_id_units_id_fk": {
-          "name": "present_marks_unit_id_units_id_fk",
-          "tableFrom": "present_marks",
-          "columnsFrom": [
-            "unit_id"
-          ],
-          "tableTo": "units",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "present_marks_marked_by_profiles_id_fk": {
-          "name": "present_marks_marked_by_profiles_id_fk",
-          "tableFrom": "present_marks",
-          "columnsFrom": [
-            "marked_by"
-          ],
-          "tableTo": "profiles",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "present_marks_event_id_person_id_pk": {
-          "name": "present_marks_event_id_person_id_pk",
-          "columns": [
-            "event_id",
-            "person_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.profiles": {
@@ -840,7 +608,8 @@
         },
         "role": {
           "name": "role",
-          "type": "text",
+          "type": "role",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -855,7 +624,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": false
         },
         "is_active": {
           "name": "is_active",
@@ -870,35 +639,27 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
-        "profiles_email_key": {
-          "name": "profiles_email_key",
+        "profiles_email_idx": {
+          "name": "profiles_email_idx",
           "columns": [
             {
-              "expression": "lower(\"email\")",
-              "isExpression": true,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "profiles_unit_idx": {
-          "name": "profiles_unit_idx",
-          "columns": [
-            {
-              "expression": "unit_id",
+              "expression": "email",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "with": {},
           "method": "btree",
           "concurrently": false
@@ -923,77 +684,171 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "profiles_role_check": {
-          "name": "profiles_role_check",
-          "value": "\"profiles\".\"role\" in ('ADMIN', 'COMMANDER')"
-        },
-        "profiles_role_unit_check": {
-          "name": "profiles_role_unit_check",
-          "value": "(\"profiles\".\"role\" = 'COMMANDER' and \"profiles\".\"unit_id\" is not null) or (\"profiles\".\"role\" = 'ADMIN' and \"profiles\".\"unit_id\" is null)"
+        "profiles_commander_has_unit": {
+          "name": "profiles_commander_has_unit",
+          "value": "\"profiles\".\"role\" <> 'COMMANDER' OR \"profiles\".\"unit_id\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false
     },
-    "public.settings": {
-      "name": "settings",
+    "public.status_spans": {
+      "name": "status_spans",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "integer",
+          "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": 1
+          "default": "gen_random_uuid()"
         },
-        "cutoff_am": {
-          "name": "cutoff_am",
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_id": {
+          "name": "unit_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'10:00'"
+          "notNull": true
         },
-        "cutoff_pm": {
-          "name": "cutoff_pm",
-          "type": "text",
+        "status": {
+          "name": "status",
+          "type": "absence_status",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'14:00'"
+          "notNull": true
         },
-        "demo_now": {
-          "name": "demo_now",
-          "type": "timestamp with time zone",
+        "sub_type": {
+          "name": "sub_type",
+          "type": "others_sub_type",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
         },
-        "last_cron_at": {
-          "name": "last_cron_at",
-          "type": "timestamp with time zone",
+        "start_date": {
+          "name": "start_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
           "primaryKey": false,
           "notNull": false
         },
-        "updated_at": {
-          "name": "updated_at",
+        "remark": {
+          "name": "remark",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "updated_by": {
-          "name": "updated_by",
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "superseded_by": {
+          "name": "superseded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replaces_id": {
+          "name": "replaces_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         }
       },
-      "indexes": {},
-      "foreignKeys": {
-        "settings_updated_by_profiles_id_fk": {
-          "name": "settings_updated_by_profiles_id_fk",
-          "tableFrom": "settings",
-          "columnsFrom": [
-            "updated_by"
+      "indexes": {
+        "spans_unit_active_idx": {
+          "name": "spans_unit_active_idx",
+          "columns": [
+            {
+              "expression": "unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "superseded_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "tableTo": "profiles",
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "spans_person_active_idx": {
+          "name": "spans_person_active_idx",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "superseded_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "status_spans_person_id_personnel_id_fk": {
+          "name": "status_spans_person_id_personnel_id_fk",
+          "tableFrom": "status_spans",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "tableTo": "personnel",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "status_spans_unit_id_units_id_fk": {
+          "name": "status_spans_unit_id_units_id_fk",
+          "tableFrom": "status_spans",
+          "columnsFrom": [
+            "unit_id"
+          ],
+          "tableTo": "units",
           "columnsTo": [
             "id"
           ],
@@ -1005,17 +860,17 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "settings_singleton_check": {
-          "name": "settings_singleton_check",
-          "value": "\"settings\".\"id\" = 1"
+        "spans_rsi_single_day": {
+          "name": "spans_rsi_single_day",
+          "value": "\"status_spans\".\"status\" <> 'RSI' OR \"status_spans\".\"end_date\" = \"status_spans\".\"start_date\""
         },
-        "settings_cutoff_am_check": {
-          "name": "settings_cutoff_am_check",
-          "value": "\"settings\".\"cutoff_am\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'"
+        "spans_others_sub_type": {
+          "name": "spans_others_sub_type",
+          "value": "\"status_spans\".\"status\" <> 'OTHERS' OR \"status_spans\".\"sub_type\" IS NOT NULL"
         },
-        "settings_cutoff_pm_check": {
-          "name": "settings_cutoff_pm_check",
-          "value": "\"settings\".\"cutoff_pm\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'"
+        "spans_date_order": {
+          "name": "spans_date_order",
+          "value": "\"status_spans\".\"end_date\" IS NULL OR \"status_spans\".\"end_date\" >= \"status_spans\".\"start_date\""
         }
       },
       "isRLSEnabled": false
@@ -1082,8 +937,8 @@
         }
       },
       "indexes": {
-        "submissions_unit_event_version_key": {
-          "name": "submissions_unit_event_version_key",
+        "submissions_version_unique": {
+          "name": "submissions_version_unique",
           "columns": [
             {
               "expression": "unit_id",
@@ -1105,6 +960,27 @@
             }
           ],
           "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "submissions_event_idx": {
+          "name": "submissions_event_idx",
+          "columns": [
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "with": {},
           "method": "btree",
           "concurrently": false
@@ -1135,31 +1011,13 @@
             "id"
           ],
           "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "submissions_submitted_by_profiles_id_fk": {
-          "name": "submissions_submitted_by_profiles_id_fk",
-          "tableFrom": "submissions",
-          "columnsFrom": [
-            "submitted_by"
-          ],
-          "tableTo": "profiles",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
           "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "submissions_version_check": {
-          "name": "submissions_version_check",
-          "value": "\"submissions\".\"version\" >= 1"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.unit_event_state": {
@@ -1197,23 +1055,7 @@
           "notNull": true
         }
       },
-      "indexes": {
-        "unit_event_state_event_idx": {
-          "name": "unit_event_state_event_idx",
-          "columns": [
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "unit_event_state_unit_id_units_id_fk": {
           "name": "unit_event_state_unit_id_units_id_fk",
@@ -1235,19 +1077,6 @@
             "event_id"
           ],
           "tableTo": "events",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "unit_event_state_last_changed_by_profiles_id_fk": {
-          "name": "unit_event_state_last_changed_by_profiles_id_fk",
-          "tableFrom": "unit_event_state",
-          "columnsFrom": [
-            "last_changed_by"
-          ],
-          "tableTo": "profiles",
           "columnsTo": [
             "id"
           ],
@@ -1301,7 +1130,55 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.absence_status": {
+      "name": "absence_status",
+      "schema": "public",
+      "values": [
+        "MC",
+        "LL",
+        "MA",
+        "RSI",
+        "OTHERS"
+      ]
+    },
+    "public.event_type": {
+      "name": "event_type",
+      "schema": "public",
+      "values": [
+        "AM",
+        "PM",
+        "ADHOC"
+      ]
+    },
+    "public.notification_type": {
+      "name": "notification_type",
+      "schema": "public",
+      "values": [
+        "SUBMITTED",
+        "RESUBMITTED",
+        "LATE"
+      ]
+    },
+    "public.others_sub_type": {
+      "name": "others_sub_type",
+      "schema": "public",
+      "values": [
+        "ATTACHED_OUT",
+        "COURSE",
+        "OUTFIELD",
+        "DUTY"
+      ]
+    },
+    "public.role": {
+      "name": "role",
+      "schema": "public",
+      "values": [
+        "ADMIN",
+        "COMMANDER"
+      ]
+    }
+  },
   "schemas": {},
   "views": {},
   "sequences": {},

@@ -1,0 +1,178 @@
+/* Shared dialog chrome: bottom sheet on phones, centred card on wide screens. */
+.dialog {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  margin: 0;
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+}
+
+.dialog:not([open]) {
+  display: none;
+}
+
+.dialog[open] {
+  animation: sheet-in var(--dur-sheet) var(--ease);
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(24px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+
+.dialog::backdrop {
+  animation: backdrop-in var(--dur-sheet) var(--ease);
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (min-width: 640px) {
+  .dialog {
+    inset: 0;
+    margin: auto;
+    width: min(480px, calc(100% - 40px));
+    max-height: calc(100dvh - 80px);
+    border-radius: var(--radius-sheet);
+  }
+}
+
+.dialog__handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  margin: 8px auto 0;
+  flex: none;
+}
+
+@media (min-width: 640px) {
+  .dialog__handle { display: none; }
+}
+
+.dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--pad-x) 8px;
+  flex: none;
+}
+
+.dialog__title {
+  font-size: var(--fs-title);
+  font-weight: 600;
+}
+
+.dialog__subtitle {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.dialog__body {
+  padding: 4px var(--pad-x) 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.dialog__footer {
+  flex: none;
+  padding: 12px var(--pad-x) calc(16px + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .dialog__footer {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+  }
+}
+
+.dialog__text {
+  font-size: var(--fs-body);
+  color: var(--text);
+}
+
+.dialog__muted {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+}
+
+/* Confirm dialog: compact card, always centred. */
+.dialog--confirm {
+  inset: 0;
+  margin: auto;
+  width: min(360px, calc(100% - 40px));
+  border-radius: var(--radius-sheet);
+  max-height: calc(100dvh - 80px);
+}
+.dialog--confirm .dialog__handle { display: none; }
+.dialog--confirm .dialog__footer { border-top: 0; padding-top: 4px; }
+
+/* Field primitives used inside sheets and forms. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field__label {
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.field__input {
+  min-height: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  font-size: var(--fs-body);
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field__input:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+}
+
+.field__input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field__error {
+  font-size: var(--fs-xs);
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.field__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}

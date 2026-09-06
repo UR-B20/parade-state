@@ -1,0 +1,126 @@
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 10px var(--pad-x) calc(12px + var(--safe-bottom));
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .footer {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+  }
+}
+
+.footer__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.footer__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  min-height: 18px;
+}
+
+.footer__status--warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.footer__status--danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.footer__changes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-s);
+  background: var(--warn-tint);
+  color: var(--warn);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.footer__changes > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer__submitted {
+  min-height: 52px;
+  border-radius: var(--radius-m);
+  background: var(--ok-tint);
+  color: var(--ok);
+  font-weight: 600;
+  font-size: var(--fs-body-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.changes-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-small);
+}
+
+.changes-list__item:last-child {
+  border-bottom: 0;
+}
+
+.changes-list__who {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.changes-list__delta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+
+.confirm-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.confirm-figure__n {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.confirm-figure__d {
+  font-size: var(--fs-body-lg);
+  color: var(--text-2);
+}

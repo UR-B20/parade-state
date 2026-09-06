@@ -1,47 +1,75 @@
-import { eq } from 'drizzle-orm';
 import { createMiddleware } from 'hono/factory';
-import { profiles, type ProfileRow } from '../db/schema';
-import type { AppEnv } from '../deps';
-import { forbidden, passwordChangeRequired, unauthorized } from '../errors';
-import type { UnitId } from '@shared/types';
+import type { Db } from '../db/client';
+import type { ProfileRow } from '../db/schema';
+import type { Bindings } from '../env';
+import type { AppDeps } from '../deps';
+import { forbidden, unauthorized } from '../errors';
+import { getProfile } from '../services/users';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type Variables = {
+  db: Db;
+  user: ProfileRow;
+  deps: AppDeps;
+  /** Real wall clock for this request. */
+  realNow: Date;
+};
 
-function bearerToken(header: string | undefined): string | null {
-  if (!header) return null;
-  const [scheme, token] = header.split(' ');
-  return scheme?.toLowerCase() === 'bearer' && token ? token : null;
+export type AppEnv = { Bindings: Bindings; Variables: Variables };
+
+/** Opens one database connection per request and releases it when the response is done. */
+export function withDb(deps: AppDeps) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const handle = deps.getDb(c.env);
+    c.set('db', handle.db);
+    c.set('deps', deps);
+    c.set('realNow', deps.now());
+    try {
+      await next();
+    } finally {
+      let ctx: { waitUntil(promise: Promise<unknown>): void } | undefined;
+      try {
+        ctx = c.executionCtx;
+      } catch {
+        ctx = undefined; // Hono throws outside a Workers runtime (tests)
+      }
+      if (ctx) ctx.waitUntil(handle.close().catch(() => undefined));
+      else await handle.close().catch(() => undefined);
+    }
+  });
 }
 
-/**
- * Require a signed-in, active user. Sets `user` on the context.
- * A user who must change their password may only reach the routes that let them do so.
- */
+/** Verifies the bearer token and loads the active profile. */
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
-  const token = bearerToken(c.req.header('Authorization'));
+  const header = c.req.header('authorization') ?? '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!token) throw unauthorized();
-  const { db, auth } = c.get('deps');
-  const userId = await auth.verifyAccessToken(token);
-  if (!userId || !UUID_RE.test(userId)) throw unauthorized('Your session has expired. Sign in again.');
-  const [profile] = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
-  if (!profile) throw unauthorized('No account for this sign-in. Ask S1 to create one.');
+  const verified = await c.get('deps').verifyToken(token, c.env);
+  const profile = await getProfile(c.get('db'), verified.sub);
+  if (!profile) throw unauthorized('Your account is not set up yet. Ask S1 to create it.');
   if (!profile.isActive) throw forbidden('This account has been deactivated');
-  if (profile.mustChangePassword && !PASSWORD_CHANGE_ALLOWED.has(c.req.routePath)) {
-    throw passwordChangeRequired();
-  }
   c.set('user', profile);
   await next();
 });
-
-const PASSWORD_CHANGE_ALLOWED = new Set(['/api/me', '/api/auth/change-password']);
 
 export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
   if (c.get('user').role !== 'ADMIN') throw forbidden('Only S1 can do this');
   await next();
 });
 
-/** Admins reach every unit; commanders only their own. */
-export function assertUnitAccess(user: ProfileRow, unitId: UnitId): void {
-  if (user.role === 'ADMIN') return;
-  if (user.unitId !== unitId) throw forbidden();
+/**
+ * Commanders may only touch their own unit. Admins may read any unit and manage any roll,
+ * but marking attendance ('write') is the commander's alone.
+ */
+export function requireUnitAccess(mode: 'read' | 'manage' | 'write') {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const user = c.get('user');
+    const unitId = c.req.param('unitId');
+    if (user.role === 'ADMIN') {
+      if (mode === 'write') throw forbidden('Only the unit commander can mark attendance');
+      await next();
+      return;
+    }
+    if (!unitId || user.unitId !== unitId) throw forbidden();
+    await next();
+  });
 }

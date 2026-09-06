@@ -1,292 +1,191 @@
-/**
- * Attendance API on the demo battalion: events, derivation, marking, submission, date locks.
- * The demo clock is on (DEMO_CONTROLS=true), so "now" is Sun 6 Sep 2026 09:24 Singapore time.
- */
-import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildDemoDataset, DEMO_DATE, type DemoDataset } from '@shared/demo/dataset';
-import type { ApiErrorBody, EventsDto, MarkResultDto, SubmissionsDto, SubmitResultDto, UnitAttendanceDto } from '@shared/types';
-import { loadDemoDataset } from '../../../seed/load';
-import * as schema from '../../worker/db/schema';
-import { createTestApp, type TestApp } from '../helpers/app';
-import { createTestDb, type TestDb } from '../helpers/pglite';
+import { createHarness, type Harness } from './harness';
+import type { EventDto, MarkResultDto, PersonDto, SettingsDto, UnitAttendanceDto } from '@shared/types';
 
-let t: TestDb;
-let api: TestApp;
-let dataset: DemoDataset;
-const userIds = new Map<string, string>();
+let h: Harness;
 let admin: string;
-let coy1: string;
-let coy2: string;
-const AM = `${DEMO_DATE}-AM`;
-const PM = `${DEMO_DATE}-PM`;
-
-const personNamed = (name: string) => dataset.personnel.find((p) => p.name === name)!;
-const attendance = (unit: string, event: string, as: string) => api.json<UnitAttendanceDto>('GET', `/units/${unit}/events/${event}/attendance`, { as });
-const mark = (unit: string, event: string, personId: string, body: unknown, as: string) =>
-  api.json<MarkResultDto & ApiErrorBody>('POST', `/units/${unit}/events/${event}/persons/${personId}/mark`, { as, body });
+let cdr1: string;
+let cdr2: string;
+const AM = '2026-09-06-AM';
+const PM = '2026-09-06-PM';
+const people: Record<string, PersonDto> = {};
 
 beforeAll(async () => {
-  t = await createTestDb();
-  api = createTestApp(t, { DEMO_CONTROLS: 'true' });
-  dataset = await buildDemoDataset();
-  for (const user of dataset.users) userIds.set(user.id, await t.createAuthUser(user.email));
-  await loadDemoDataset(t.db, dataset, { userIds });
-  admin = userIds.get(dataset.users[0]!.id)!;
-  coy1 = userIds.get(dataset.users.find((u) => u.unitId === 'COY1')!.id)!;
-  coy2 = userIds.get(dataset.users.find((u) => u.unitId === 'COY2')!.id)!;
+  h = await createHarness({ DEMO_CONTROLS: 'true' } as never);
+  admin = await h.seedUser({ email: 's1@bn.sg', role: 'ADMIN' });
+  cdr1 = await h.seedUser({ email: 'cdr.coy1@bn.sg', role: 'COMMANDER', unitId: 'COY1' });
+  cdr2 = await h.seedUser({ email: 'cdr.coy2@bn.sg', role: 'COMMANDER', unitId: 'COY2' });
+  for (const [rank, name] of [['CPL', 'Daniel Tan'], ['LCP', 'Amir Rahman'], ['3SG', 'Ryan Lim']] as const) {
+    const res = await h.json<PersonDto>('/units/COY1/personnel', { method: 'POST', as: cdr1, json: { rank, name, postedInDate: '2026-01-01' } });
+    expect(res.status).toBe(201);
+    people[name] = res.body;
+  }
 });
+afterAll(async () => { await h.close(); });
 
-afterAll(async () => {
-  await t?.close();
-});
+const attendance = (eventId: string, as = cdr1) => h.json<UnitAttendanceDto>(`/units/COY1/attendance/${eventId}`, { as });
+const mark = (eventId: string, personId: string, json: unknown, as = cdr1) => h.json<MarkResultDto>(`/units/COY1/attendance/${eventId}/persons/${personId}`, { method: 'PUT', as, json });
+const statusOf = (dto: UnitAttendanceDto, name: string) => dto.persons.find((p) => p.name === name)!;
 
 describe('events', () => {
-  it("lists today's parades with cutoffs from settings", async () => {
-    const { status, body } = await api.json<EventsDto>('GET', `/events?date=${DEMO_DATE}`, { as: coy1 });
+  it('creates AM and PM parades for a date on first request, with cut-offs from settings', async () => {
+    const { status, body } = await h.json<EventDto[]>('/events?date=2026-09-06', { as: cdr1 });
     expect(status).toBe(200);
-    expect(body.date).toBe(DEMO_DATE);
-    expect(body.events.map((e) => [e.id, e.label, e.cutoffAt])).toEqual([
-      [AM, 'AM parade', '2026-09-06T02:00:00.000Z'],
-      [PM, 'PM parade', '2026-09-06T06:00:00.000Z'],
-    ]);
+    expect(body.map((e) => e.id)).toEqual([AM, PM]);
+    expect(body[0]!.cutoffAt).toBe('2026-09-06T02:00:00.000Z');
+    expect(body[1]!.cutoffAt).toBe('2026-09-06T06:00:00.000Z');
   });
 
-  it('creates parades for a new date on first access, once', async () => {
-    const first = await api.json<EventsDto>('GET', '/events?date=2026-09-07', { as: coy1 });
-    const second = await api.json<EventsDto>('GET', '/events?date=2026-09-07', { as: coy1 });
-    expect(first.body.events.map((e) => e.id)).toEqual(['2026-09-07-AM', '2026-09-07-PM']);
-    expect(second.body.events).toEqual(first.body.events);
-    const today = await api.json<EventsDto>('GET', '/events', { as: coy1 });
-    expect(today.body.date).toBe(DEMO_DATE);
-  });
-
-  it('rejects bad or far-away dates', async () => {
-    expect((await api.call('GET', '/events?date=2026-02-30', { as: coy1 })).status).toBe(400);
-    expect((await api.call('GET', '/events?date=2030-01-01', { as: coy1 })).status).toBe(400);
+  it('lets only S1 create ad hoc events', async () => {
+    expect((await h.request('/events', { method: 'POST', as: cdr1, json: { date: '2026-09-06', name: 'Route march', cutoffTime: '15:00' } })).status).toBe(403);
+    const created = await h.json<EventDto>('/events', { method: 'POST', as: admin, json: { date: '2026-09-06', name: 'Route march', cutoffTime: '15:00' } });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ type: 'ADHOC', label: 'Route march', cutoffAt: '2026-09-06T07:00:00.000Z' });
+    const list = await h.json<EventDto[]>('/events?date=2026-09-06', { as: admin });
+    expect(list.body).toHaveLength(3);
   });
 });
 
-describe('unit attendance', () => {
-  it('derives Coy 1 at the AM parade as in the brief', async () => {
-    const { status, body } = await attendance('COY1', AM, coy1);
+describe('roll', () => {
+  it('scopes commanders to their own unit and lets S1 read any', async () => {
+    expect((await h.request('/units/COY1/personnel', { as: cdr2 })).status).toBe(403);
+    expect((await h.request('/units/COY1/personnel', { as: admin })).status).toBe(200);
+    const mine = await h.json<PersonDto[]>('/units/COY1/personnel', { as: cdr1 });
+    expect(mine.body.map((p) => p.name)).toEqual(['Ryan Lim', 'Daniel Tan', 'Amir Rahman']);
+  });
+
+  it('validates new personnel', async () => {
+    const bad = await h.json<{ error: { details: { fields: Record<string, string> } } }>('/units/COY1/personnel', { method: 'POST', as: cdr1, json: { rank: 'GENERAL', name: 'X' } });
+    expect(bad.status).toBe(400);
+    expect(Object.keys(bad.body.error.details.fields).sort()).toEqual(['name', 'rank']);
+  });
+
+  it('posts personnel out and hides them from the active roll and from attendance', async () => {
+    const tmp = await h.json<PersonDto>('/units/COY1/personnel', { method: 'POST', as: cdr1, json: { rank: 'PTE', name: 'Leaving Soon', postedInDate: '2026-01-01' } });
+    const out = await h.json<PersonDto>(`/units/COY1/personnel/${tmp.body.id}`, { method: 'PATCH', as: cdr1, json: { postedOutDate: '2026-09-01' } });
+    expect(out.body.postedOutDate).toBe('2026-09-01');
+    expect((await h.json<PersonDto[]>('/units/COY1/personnel', { as: cdr1 })).body.some((p) => p.id === tmp.body.id)).toBe(false);
+    expect((await h.json<PersonDto[]>('/units/COY1/personnel?includeInactive=1', { as: cdr1 })).body.some((p) => p.id === tmp.body.id)).toBe(true);
+    expect((await attendance(AM)).body.persons.some((p) => p.personId === tmp.body.id)).toBe(false);
+    expect((await mark(AM, tmp.body.id, { action: 'PRESENT' })).status).toBe(400);
+    const badDate = await h.json(`/units/COY1/personnel/${tmp.body.id}`, { method: 'PATCH', as: cdr1, json: { postedOutDate: '2025-12-01' } });
+    expect(badDate.status).toBe(400);
+  });
+});
+
+describe('attendance', () => {
+  it('starts with everyone unmarked and no activity', async () => {
+    const { status, body } = await attendance(AM);
     expect(status).toBe(200);
-    expect(body.unit.name).toBe('Coy 1');
-    expect(body.event.id).toBe(AM);
-    expect(body.counts).toMatchObject({ strength: 102, present: 96, absent: 6, mc: 2, ll: 1, ma: 1, rsi: 1, others: 1 });
-    expect(body.persons).toHaveLength(102);
-    expect(body.submission).toMatchObject({ kind: 'PENDING', lastChangedAt: '2026-09-06T01:21:00.000Z' });
-    expect(body.changes).toEqual([]);
-    expect(body.locked).toBe(false);
-    expect(body.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    const daniel = body.persons.find((p) => p.name === 'Daniel Tan')!;
-    expect(daniel).toMatchObject({ status: 'MC', confirmed: true, startDate: '2026-09-05', endDate: '2026-09-08' });
-  });
-
-  it('shows submitted units with the latest version and no changes', async () => {
-    const ssp = await attendance('SSP', AM, admin);
-    expect(ssp.body.submission).toMatchObject({ kind: 'RESUBMITTED', version: 2, wasLate: false, hasChanges: false });
-    const s2 = await attendance('S2', AM, admin);
-    expect(s2.body.submission).toEqual({ kind: 'NOT_MARKED' });
-  });
-
-  it("refuses a commander another unit's attendance", async () => {
-    const { status, body } = await attendance('COY1', AM, coy2);
-    expect(status).toBe(403);
-    expect((body as unknown as ApiErrorBody).error.code).toBe('FORBIDDEN');
-  });
-
-  it('resolves a parade id for a date nobody has opened yet', async () => {
-    const { status, body } = await attendance('COY1', '2026-09-08-PM', coy1);
-    expect(status).toBe(200);
-    expect(body.event).toMatchObject({ id: '2026-09-08-PM', date: '2026-09-08', type: 'PM' });
+    expect(body.counts).toMatchObject({ strength: 3, present: 0, unmarked: 3, absent: 0 });
     expect(body.submission).toEqual({ kind: 'NOT_MARKED' });
-  });
-});
-
-describe('marking', () => {
-  it('confirms a default Present', async () => {
-    const before = await attendance('COY1', AM, coy1);
-    const target = before.body.persons.find((p) => p.status === 'PRESENT' && !p.confirmed)!;
-    const { status, body } = await mark('COY1', AM, target.personId, { action: 'PRESENT' }, coy1);
-    expect(status).toBe(200);
-    expect(body.person).toMatchObject({ personId: target.personId, status: 'PRESENT', confirmed: true });
-    expect(body.counts.presentConfirmed).toBe(before.body.counts.presentConfirmed + 1);
-    expect(body.counts.present).toBe(before.body.counts.present);
-    expect(body.contentHash).toBe(before.body.contentHash);
-    expect(body.submission).toMatchObject({ kind: 'PENDING', lastChangedAt: '2026-09-06T01:24:00.000Z' });
-    expect(body.updatedAt).toBe('2026-09-06T01:24:00.000Z');
+    expect(body.updatedAt).toBeNull();
+    expect(body.locked).toBe(false);
   });
 
-  it('sets a multi-day MC and removes the person from Present', async () => {
-    const amir = personNamed('Amir Rahman');
-    const { status, body } = await mark(
-      'COY1', AM, amir.id,
-      { action: 'SET', status: 'MC', startDate: DEMO_DATE, endDate: '2026-09-08', remark: '  Fever  ' },
-      coy1,
-    );
-    expect(status).toBe(200);
-    expect(body.person).toMatchObject({ status: 'MC', confirmed: true, startDate: DEMO_DATE, endDate: '2026-09-08', remark: 'Fever' });
-    expect(body.counts).toMatchObject({ mc: 3, present: 95, absent: 7 });
-    // The same span shows on the PM parade and later days.
-    const pm = await attendance('COY1', PM, coy1);
-    expect(pm.body.persons.find((p) => p.personId === amir.id)!.status).toBe('MC');
-    const later = await attendance('COY1', '2026-09-09-AM', coy1);
-    expect(later.body.persons.find((p) => p.personId === amir.id)!.status).toBe('PRESENT');
+  it('a multi-day MC covers AM, PM and the following days', async () => {
+    const daniel = people['Daniel Tan']!.id;
+    const res = await mark(AM, daniel, { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-08', remark: ' Fever ' });
+    expect(res.status).toBe(200);
+    expect(res.body.person).toMatchObject({ status: 'MC', endDate: '2026-09-08', remark: 'Fever' });
+    expect(res.body.counts).toMatchObject({ present: 0, unmarked: 2, mc: 1, absent: 1 });
+    expect(res.body.submission.kind).toBe('PENDING');
+    expect(statusOf((await attendance(PM)).body, 'Daniel Tan').status).toBe('MC');
+    expect(statusOf((await attendance('2026-09-08-AM')).body, 'Daniel Tan').status).toBe('MC');
+    expect(statusOf((await attendance('2026-09-09-AM')).body, 'Daniel Tan').status).toBe('UNMARKED');
   });
 
-  it('validates the SET body', async () => {
-    const ryan = personNamed('Ryan Lim');
-    const cases: [unknown, RegExp][] = [
-      [{ action: 'SET', status: 'MC', startDate: '2026-09-07', endDate: '2026-09-08' }, /include/],
-      [{ action: 'SET', status: 'MC', startDate: '2026-09-05', endDate: '2026-09-04' }, /before/],
-      [{ action: 'SET', status: 'OTHERS', startDate: DEMO_DATE, endDate: null }, /kind/],
-      [{ action: 'SET', status: 'MC', subType: 'COURSE', startDate: DEMO_DATE, endDate: null }, /Others/],
-      [{ action: 'SET', status: 'AWOL', startDate: DEMO_DATE, endDate: null }, /fields/],
-      [{ action: 'SET', status: 'MC', startDate: 'tomorrow', endDate: null }, /fields/],
-    ];
-    for (const [body, pattern] of cases) {
-      const res = await mark('COY1', AM, ryan.id, body, coy1);
-      expect(res.status, JSON.stringify(body)).toBe(400);
-      expect(res.body.error.message, JSON.stringify(body)).toMatch(pattern);
-    }
-    const after = await attendance('COY1', AM, coy1);
-    expect(after.body.persons.find((p) => p.personId === ryan.id)!.status).toBe('PRESENT');
+  it('PRESENT marks this event only; the MC keeps running', async () => {
+    const daniel = people['Daniel Tan']!.id;
+    const res = await mark(AM, daniel, { action: 'PRESENT' });
+    expect(res.body.person).toMatchObject({ status: 'PRESENT' });
+    expect(statusOf((await attendance(PM)).body, 'Daniel Tan').status).toBe('MC');
   });
 
-  it('pins RSI to the parade date whatever dates are sent', async () => {
-    const ryan = personNamed('Ryan Lim');
-    const { body } = await mark('COY1', AM, ryan.id, { action: 'SET', status: 'RSI', startDate: '2026-09-01', endDate: null }, coy1);
-    expect(body.person).toMatchObject({ status: 'RSI', startDate: DEMO_DATE, endDate: DEMO_DATE });
+  it('setting a new absence removes the confirmed-present mark inside its range', async () => {
+    const daniel = people['Daniel Tan']!.id;
+    await mark(AM, daniel, { action: 'SET', status: 'LL', startDate: '2026-09-06', endDate: '2026-09-07' });
+    expect(statusOf((await attendance(AM)).body, 'Daniel Tan').status).toBe('LL');
+    // The earlier MC was truncated to nothing (it started today), so the 8th is unmarked again.
+    expect(statusOf((await attendance('2026-09-08-AM')).body, 'Daniel Tan').status).toBe('UNMARKED');
   });
 
-  it('lets Others carry a kind and an open end date', async () => {
-    const ryan = personNamed('Ryan Lim');
-    const { body } = await mark(
-      'COY1', AM, ryan.id,
-      { action: 'SET', status: 'OTHERS', subType: 'DUTY', startDate: DEMO_DATE, endDate: null, remark: 'Guard duty' },
-      coy1,
-    );
-    expect(body.person).toMatchObject({ status: 'OTHERS', subType: 'DUTY', endDate: null, remark: 'Guard duty' });
-    const spans = await t.db.select().from(schema.absenceSpans).where(and(eq(schema.absenceSpans.personId, ryan.id), isNull(schema.absenceSpans.supersededAt)));
-    expect(spans).toHaveLength(1);
-    expect(spans[0]!.status).toBe('OTHERS');
+  it('BACK_TO_PRESENT ends the absence from today and confirms Present', async () => {
+    const daniel = people['Daniel Tan']!.id;
+    const res = await mark(PM, daniel, { action: 'BACK_TO_PRESENT' });
+    expect(res.body.person).toMatchObject({ status: 'PRESENT' });
+    // The LL started today, so ending it from today removes it entirely: AM falls back to unmarked.
+    expect(statusOf((await attendance(AM)).body, 'Daniel Tan')).toMatchObject({ status: 'UNMARKED' });
+    expect(statusOf((await attendance(PM)).body, 'Daniel Tan')).toMatchObject({ status: 'PRESENT' });
   });
 
-  it('brings an MC person back to Present and keeps the earlier days as history', async () => {
-    const daniel = personNamed('Daniel Tan');
-    const { status, body } = await mark('COY1', AM, daniel.id, { action: 'BACK_TO_PRESENT' }, coy1);
-    expect(status).toBe(200);
-    expect(body.person).toMatchObject({ status: 'PRESENT', confirmed: true, spanId: null });
-    const spans = await t.db.select().from(schema.absenceSpans).where(eq(schema.absenceSpans.personId, daniel.id));
-    const active = spans.filter((s) => s.supersededAt === null);
-    const superseded = spans.filter((s) => s.supersededAt !== null);
-    expect(superseded).toHaveLength(1);
-    expect(superseded[0]).toMatchObject({ startDate: '2026-09-05', endDate: '2026-09-08' });
-    expect(active).toHaveLength(1);
-    expect(active[0]).toMatchObject({ status: 'MC', startDate: '2026-09-05', endDate: '2026-09-05', remark: 'Fever, Bedok Polyclinic' });
-    const yesterday = await attendance('COY1', '2026-09-05-AM', admin);
-    expect(yesterday.body.persons.find((p) => p.personId === daniel.id)!.status).toBe('MC');
+  it('RSI applies to the day only', async () => {
+    const amir = people['Amir Rahman']!.id;
+    const res = await mark(AM, amir, { action: 'SET', status: 'RSI', startDate: '2026-09-01', endDate: null });
+    expect(res.body.person).toMatchObject({ status: 'RSI', startDate: '2026-09-06', endDate: '2026-09-06' });
+    expect(statusOf((await attendance(PM)).body, 'Amir Rahman').status).toBe('RSI');
+    expect(statusOf((await attendance('2026-09-07-AM')).body, 'Amir Rahman').status).toBe('UNMARKED');
   });
 
-  it('refuses people outside the unit or off the roll', async () => {
-    const other = dataset.personnel.find((p) => p.unitId === 'COY2')!;
-    expect((await mark('COY1', AM, other.id, { action: 'PRESENT' }, coy1)).status).toBe(404);
-    expect((await mark('COY2', AM, other.id, { action: 'PRESENT' }, coy1)).status).toBe(403);
-    expect((await mark('COY1', AM, '00000000-0000-0000-0000-000000000000', { action: 'PRESENT' }, coy1)).status).toBe(404);
-  });
-});
-
-describe('submission', () => {
-  it('records version 1 and notifies S1', async () => {
-    const before = await attendance('COY1', AM, coy1);
-    const notesBefore = await t.db.select().from(schema.notifications);
-    const { status, body } = await api.json<SubmitResultDto>('POST', '/units/COY1/events/' + AM + '/submit', { as: coy1, body: { contentHash: before.body.contentHash } });
-    expect(status).toBe(201);
-    expect(body.submission).toMatchObject({ unitId: 'COY1', eventId: AM, version: 1, submittedByName: 'Coy 1 commander', submittedAt: '2026-09-06T01:24:00.000Z' });
-    expect(body.submission.counts).toEqual(before.body.counts);
-    expect(body.attendance.submission).toMatchObject({ kind: 'SUBMITTED', version: 1, wasLate: false, hasChanges: false });
-    expect(body.attendance.changes).toEqual([]);
-    const notes = await t.db.select().from(schema.notifications);
-    expect(notes).toHaveLength(notesBefore.length + 1);
-    const note = notes.find((n) => n.submissionId === body.submission.id)!;
-    expect(note).toMatchObject({ userId: admin, type: 'SUBMITTED', unitId: 'COY1', readAt: null });
-    expect(note.message).toBe(`Coy 1 submitted AM parade · ${before.body.counts.present}/102 present`);
+  it('marks everyone still unmarked as Present in one call, leaving absences alone', async () => {
+    const before = (await attendance(AM)).body;
+    expect(before.counts.unmarked).toBeGreaterThan(0);
+    const res = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: cdr1 });
+    expect(res.status).toBe(200);
+    expect(res.body.counts.unmarked).toBe(0);
+    expect(statusOf(res.body, 'Amir Rahman').status).toBe('RSI');
+    expect(statusOf(res.body, 'Ryan Lim').status).toBe('PRESENT');
+    expect((await h.request(`/units/COY1/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: admin })).status).toBe(403);
   });
 
-  it('refuses to resubmit with no changes or with a stale hash', async () => {
-    const same = await api.json<ApiErrorBody>('POST', `/units/COY1/events/${AM}/submit`, { as: coy1, body: {} });
-    expect(same.status).toBe(409);
-    expect(same.body.error.message).toMatch(/Nothing has changed/);
-    const stale = await api.json<ApiErrorBody>('POST', `/units/COY1/events/${AM}/submit`, { as: coy1, body: { contentHash: 'f'.repeat(64) } });
-    expect(stale.status).toBe(409);
-    expect(stale.body.error.message).toMatch(/changed since you reviewed/);
+  it('validates mark bodies', async () => {
+    const ryan = people['Ryan Lim']!.id;
+    expect((await mark(AM, ryan, { action: 'SET', status: 'OTHERS', startDate: '2026-09-06', endDate: null })).status).toBe(400);
+    expect((await mark(AM, ryan, { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-05' })).status).toBe(400);
+    expect((await mark(AM, ryan, { action: 'DANCE' })).status).toBe(400);
   });
 
-  it('shows the diff after a change and resubmits as version 2', async () => {
-    const ryan = personNamed('Ryan Lim');
-    const marked = await mark('COY1', AM, ryan.id, { action: 'BACK_TO_PRESENT' }, coy1);
-    expect(marked.body.submission).toMatchObject({ kind: 'SUBMITTED', version: 1, hasChanges: true });
-    expect(marked.body.changes).toEqual([
-      expect.objectContaining({
-        personId: ryan.id,
-        before: expect.objectContaining({ status: 'OTHERS', subType: 'DUTY' }),
-        after: expect.objectContaining({ status: 'PRESENT' }),
-      }),
-    ]);
-    const { status, body } = await api.json<SubmitResultDto>('POST', `/units/COY1/events/${AM}/submit`, { as: coy1, body: {} });
-    expect(status).toBe(201);
-    expect(body.submission.version).toBe(2);
-    expect(body.attendance.submission).toMatchObject({ kind: 'RESUBMITTED', version: 2, hasChanges: false });
-    const history = await api.json<SubmissionsDto>('GET', `/units/COY1/events/${AM}/submissions`, { as: coy1 });
-    expect(history.body.submissions.map((s) => s.version)).toEqual([2, 1]);
-    expect((await api.call('GET', `/units/COY1/events/${AM}/submissions`, { as: coy2 })).status).toBe(403);
+  it('enforces roles: other commanders and S1 cannot mark', async () => {
+    const ryan = people['Ryan Lim']!.id;
+    expect((await mark(AM, ryan, { action: 'PRESENT' }, cdr2)).status).toBe(403);
+    expect((await mark(AM, ryan, { action: 'PRESENT' }, admin)).status).toBe(403);
+    expect((await attendance(AM, admin)).status).toBe(200);
   });
 
-  it('marks a submission made after cutoff as late', async () => {
-    await t.db.update(schema.settings).set({ demoNow: new Date('2026-09-06T02:30:00.000Z') });
-    try {
-      const s2 = await attendance('S2', AM, admin);
-      expect(s2.body.submission).toEqual({ kind: 'LATE', hasActivity: false, lastChangedAt: null });
-      const coy1Pm = await attendance('COY1', PM, coy1);
-      expect(coy1Pm.body.submission.kind).toBe('NOT_MARKED');
-      const { body } = await api.json<SubmitResultDto>('POST', `/units/S2/events/${AM}/submit`, { as: admin, body: {} });
-      expect(body.attendance.submission).toMatchObject({ kind: 'SUBMITTED', version: 1, wasLate: true });
-    } finally {
-      await t.db.update(schema.settings).set({ demoNow: new Date(dataset.now) });
-    }
-  });
-});
-
-describe('date lock', () => {
-  const yesterday = '2026-09-05-AM';
-
-  it('locks past dates for commanders but never for S1', async () => {
-    const daniel = personNamed('Daniel Tan');
-    const view = await attendance('COY1', yesterday, coy1);
+  it('locks past dates for commanders until S1 unlocks them', async () => {
+    const ryan = people['Ryan Lim']!.id;
+    const pastAm = '2026-09-05-AM';
+    const view = await attendance(pastAm);
     expect(view.body.locked).toBe(true);
-    const asCommander = await mark('COY1', yesterday, daniel.id, { action: 'PRESENT' }, coy1);
-    expect(asCommander.status).toBe(403);
-    expect(asCommander.body.error.code).toBe('DATE_LOCKED');
-    const submit = await api.json<ApiErrorBody>('POST', `/units/COY1/events/${yesterday}/submit`, { as: coy1, body: {} });
-    expect(submit.body.error.code).toBe('DATE_LOCKED');
-    const asAdmin = await mark('COY1', yesterday, daniel.id, { action: 'PRESENT' }, admin);
-    expect(asAdmin.status).toBe(200);
-    expect((await attendance('COY1', yesterday, admin)).body.locked).toBe(false);
+    const locked = await h.json<{ error: { code: string } }>(`/units/COY1/attendance/${pastAm}/persons/${ryan}`, { method: 'PUT', as: cdr1, json: { action: 'PRESENT' } });
+    expect(locked.status).toBe(403);
+    expect(locked.body.error.code).toBe('DATE_LOCKED');
+    expect((await h.request('/admin/date-unlocks/2026-09-05', { method: 'POST', as: cdr1 })).status).toBe(403);
+    expect((await h.json('/admin/date-unlocks/2026-09-06', { method: 'POST', as: admin })).status).toBe(400);
+    const unlocked = await h.json<SettingsDto>('/admin/date-unlocks/2026-09-05', { method: 'POST', as: admin });
+    expect(unlocked.body.dateUnlocks.map((u) => u.date)).toEqual(['2026-09-05']);
+    expect((await attendance(pastAm)).body.locked).toBe(false);
+    expect((await mark(pastAm, ryan, { action: 'PRESENT' })).status).toBe(200);
+    await h.request('/admin/date-unlocks/2026-09-05', { method: 'DELETE', as: admin });
+    expect((await attendance(pastAm)).body.locked).toBe(true);
+  });
+});
+
+describe('settings and demo clock', () => {
+  it('updates cut-offs and applies them to newly created dates', async () => {
+    const res = await h.json<SettingsDto>('/admin/settings', { method: 'PUT', as: admin, json: { cutoffAm: '09:30' } });
+    expect(res.body.cutoffAm).toBe('09:30');
+    const list = await h.json<EventDto[]>('/events?date=2026-10-01', { as: admin });
+    expect(list.body[0]!.cutoffAt).toBe('2026-10-01T01:30:00.000Z');
+    expect((await h.json('/admin/settings', { method: 'PUT', as: admin, json: { cutoffPm: '25:00' } })).status).toBe(400);
   });
 
-  it('opens a past date while an S1 unlock is in force', async () => {
-    const daniel = personNamed('Daniel Tan');
-    await t.db.insert(schema.dateUnlocks).values({ date: '2026-09-05', unlockedBy: admin, expiresAt: new Date('2026-09-06T03:00:00.000Z') });
-    expect((await attendance('COY1', yesterday, coy1)).body.locked).toBe(false);
-    expect((await mark('COY1', yesterday, daniel.id, { action: 'PRESENT' }, coy1)).status).toBe(200);
-    await t.db.update(schema.dateUnlocks).set({ expiresAt: new Date('2026-09-06T01:00:00.000Z') });
-    expect((await attendance('COY1', yesterday, coy1)).body.locked).toBe(true);
-    expect((await mark('COY1', yesterday, daniel.id, { action: 'PRESENT' }, coy1)).status).toBe(403);
-  });
-
-  it('keeps future dates open', async () => {
-    const daniel = personNamed('Daniel Tan');
-    expect((await mark('COY1', '2026-09-07-AM', daniel.id, { action: 'PRESENT' }, coy1)).status).toBe(200);
+  it('moves the demo clock, which flips units to Late after cut-off without touching real timestamps', async () => {
+    await h.json('/admin/demo-clock', { method: 'PUT', as: admin, json: { now: '2026-09-06T02:05:00.000Z' } });
+    const dto = (await attendance(AM)).body;
+    expect(dto.submission.kind).toBe('LATE');
+    expect(dto.updatedAt).toBe(h.clock.now.toISOString());
+    await h.json('/admin/demo-clock', { method: 'PUT', as: admin, json: { now: null } });
+    expect((await attendance(AM)).body.submission.kind).toBe('PENDING');
   });
 });

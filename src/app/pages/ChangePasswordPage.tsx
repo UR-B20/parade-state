@@ -1,74 +1,67 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { keys, useMe } from '../api/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
-import { TopBar } from '../components/ui';
-import { useBackend } from '../providers';
+import { keys } from '../api/keys';
+import { useApi } from '../api/provider';
+import { useAuth } from '../state/auth';
+import { AppHeader } from '../components/AppHeader';
+import { Button } from '../components/Button';
+import { useToast } from '../components/Toast';
+import '../components/Dialog.css';
+import './pages.css';
 
 export function ChangePasswordPage() {
-  const { api, session } = useBackend();
-  const me = useMe();
+  const api = useApi();
+  const me = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const toast = useToast();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const forced = me.data?.user.mustChangePassword ?? false;
 
-  async function onSubmit(ev: FormEvent) {
-    ev.preventDefault();
-    if (password !== confirm) {
-      setError('The two passwords do not match');
-      return;
-    }
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (password.length < 8) return setError('Use at least 8 characters');
+    if (password !== confirm) return setError('The two passwords do not match');
     setBusy(true);
     setError(null);
     try {
-      const result = await api.changePassword({ newPassword: password });
-      qc.setQueryData(keys.me, (data: typeof me.data) => (data ? { ...data, user: result.user } : data));
+      await api.changePassword(password);
+      await qc.invalidateQueries({ queryKey: keys.me });
+      toast.show('Password changed');
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not change the password. Check your connection.');
+      setError(err instanceof ApiError ? err.message : 'Could not change the password. Try again.');
     } finally {
       setBusy(false);
     }
-  }
+  };
 
   return (
-    <>
-      <TopBar
-        title={forced ? 'Set a new password' : 'Change password'}
-        back={forced ? undefined : '/'}
-        right={
-          forced ? (
-            <button type="button" className="btn btn--text" onClick={() => void session.signOut()}>
-              Sign out
-            </button>
-          ) : undefined
-        }
-      />
-      <main className="screen screen--narrow" style={{ justifyContent: 'flex-start' }}>
-        {forced && <p className="muted">You signed in with a temporary password. Choose your own before continuing.</p>}
-        <form className="stack" onSubmit={onSubmit} noValidate>
-          <div className="field">
-            <label htmlFor="new-password">New password</label>
-            <input id="new-password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
-            <span className="muted" style={{ fontSize: 'var(--text-s)' }}>
-              At least 8 characters.
-            </span>
-          </div>
-          <div className="field">
-            <label htmlFor="confirm-password">Repeat it</label>
-            <input id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-          </div>
-          {error && <div className="form-error" role="alert">{error}</div>}
-          <button type="submit" className="btn btn--primary btn--block" disabled={busy || password.length < 8 || !confirm}>
-            {busy ? 'Saving…' : 'Save password'}
-          </button>
+    <div className="page page--column">
+      <AppHeader title="Change password" meta={me.user.email} />
+      <main className="page__content">
+        {me.user.mustChangePassword && (
+          <p className="dialog__text" style={{ padding: '4px 0' }}>Your password was set by S1. Choose a new one before you continue.</p>
+        )}
+        <form className="roll" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} onSubmit={submit} noValidate>
+          <label className="field">
+            <span className="field__label">New password</span>
+            <input className="field__input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={!!error || undefined} />
+            <span className="field__hint">At least 8 characters.</span>
+          </label>
+          <label className="field">
+            <span className="field__label">Confirm new password</span>
+            <input className="field__input" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          </label>
+          {error && <span className="field__error" role="alert">{error}</span>}
+          <Button type="submit" variant="primary" block busy={busy}>Save new password</Button>
+          {!me.user.mustChangePassword && <Button variant="ghost" block onClick={() => navigate(-1)}>Cancel</Button>}
         </form>
       </main>
-    </>
+    </div>
   );
 }

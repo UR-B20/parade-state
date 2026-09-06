@@ -5,15 +5,36 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1788707441077,
-      "tag": "0000_schema",
+      "when": 1788649825751,
+      "tag": "0000_init",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1788707449031,
-      "tag": "0001_security",
+      "when": 1788649874331,
+      "tag": "0001_supabase",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788649875082,
+      "tag": "0002_seed_units",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788699564189,
+      "tag": "0003_platoons",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788699565328,
+      "tag": "0004_seed_platoons",
       "breakpoints": true
     }
   ]

@@ -1,199 +1,593 @@
 /**
- * Demo backend: the real API running in the browser on PGlite, seeded with the fictional
- * battalion. Enabled by VITE_MOCK_API=1 (pnpm dev:mock, the e2e suite). Nothing here ships in
- * production builds because the import is behind a dead branch there.
- *
- * Accounts live in memory; the demo password signs in any demo user. Data persists in
- * IndexedDB between reloads until "Reset demo data" is used.
+ * In-memory API backed by the fictional battalion. Used for design review
+ * (`pnpm dev:mock`) and Playwright UI tests. Mutations follow the same domain
+ * rules as the Worker so the UI behaves identically against either.
  */
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import { buildDemoDataset, DEMO_PASSWORD } from '@shared/demo/dataset';
-import { loadDemoDataset } from '../../../seed/load';
-import { createApp } from '../../worker/app';
-import type { AuthProvider } from '../../worker/auth/provider';
-import type { Db } from '../../worker/deps';
-import type { Bindings } from '../../worker/env';
-import { conflict } from '../../worker/errors';
-import * as schema from '../../worker/db/schema';
-import type { AuthSession, DemoAccount } from '../auth/session';
-import type { Fetcher } from './client';
+import { addDays, formatSgTime, sgDateOf, sgLocalToIso, type IsoDate, type IsoTimestamp } from '@shared/dates';
+import type { AbsenceStatus } from '@shared/statuses';
+import type {
+  AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto, PlatoonDto,
+  SettingsDto, SubmissionDto, SubmissionState, TrendsDto, UnitAttendanceDto, UnitDto, UnitId, UserDto,
+} from '@shared/types';
+import {
+  awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, isDateLocked,
+  MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, buildTrends, trendDates, type SnapshotEntry, type SpanRow, type TrendSubmission,
+} from '@shared/domain';
+import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
+import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
 
-const migrationFiles = import.meta.glob('../../../migrations/*.sql', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+const LATENCY_MS = 220;
+const ADMIN_EMAIL = 's1admin@parade-state.demo';
+const DEFAULT_EMAIL = 'cdr.coy1@parade-state.demo';
 
-const SUPABASE_SHIM = `
-  create schema if not exists auth;
-  create table if not exists auth.users (id uuid primary key, email text);
-  create or replace function auth.uid() returns uuid language sql stable as $$
-    select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-  $$;
-  do $$
-  begin
-    if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
-    if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
-    if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
-  end $$;
-  grant usage on schema public to anon, authenticated, service_role;
-`;
+interface MockAdhoc extends EventDto { type: 'ADHOC' }
 
-const DATA_DIR = 'idb://parade-state-demo';
-const SESSION_KEY = 'parade-state:demo-user';
+export class MockApi implements ApiClient {
+  private data!: DemoDataset;
+  private ready: Promise<void>;
+  private currentEmail: string | null = null;
+  private demoNow: IsoTimestamp | null;
+  private adhoc: MockAdhoc[] = [];
+  private cutoffs = { am: '10:00', pm: '14:00' };
+  private unlocks: { date: IsoDate; unlockedBy: string; expiresAt: IsoTimestamp }[] = [];
+  private idSeq = 1;
 
-interface Account {
-  id: string;
-  email: string;
-  password: string;
-  displayName: string;
-  label: string;
-}
-
-export interface DemoControls {
-  /** Make every API call fail as if the phone had no signal. */
-  setOffline(offline: boolean): void;
-  isOffline(): boolean;
-  subscribe(listener: () => void): () => void;
-  /** Drop the demo database and reload the page. */
-  reset(): Promise<void>;
-}
-
-export interface MockBackend {
-  fetcher: Fetcher;
-  session: AuthSession;
-  demo: DemoControls;
-}
-
-async function applyMigrations(client: PGlite): Promise<void> {
-  const files = Object.entries(migrationFiles).sort(([a], [b]) => a.localeCompare(b));
-  for (const [, sql] of files) {
-    for (const statement of sql.split('--> statement-breakpoint')) {
-      if (statement.trim()) await client.exec(statement);
-    }
+  constructor() {
+    this.ready = buildDemoDataset().then((d) => {
+      this.data = d;
+    });
+    this.demoNow = null;
+    // Open on the demo snapshot by default.
+    this.demoNow = sgLocalToIso('2026-09-06', '09:24');
   }
-}
 
-export async function createMockBackend(): Promise<MockBackend> {
-  const client = new PGlite(DATA_DIR);
-  await client.exec(SUPABASE_SHIM);
-  const db = drizzle(client, { schema });
-  const accounts = new Map<string, Account>();
-
-  const seeded = await client.query<{ present: string | null }>("select to_regclass('public.units')::text as present");
-  const dataset = await buildDemoDataset();
-  if (!seeded.rows[0]?.present) {
-    await applyMigrations(client);
-    const userIds = new Map<string, string>();
-    for (const u of dataset.users) {
-      const row = await client.query<{ id: string }>('insert into auth.users (id, email) values (gen_random_uuid(), $1) returning id', [u.email]);
-      userIds.set(u.id, row.rows[0]!.id);
-    }
-    await loadDemoDataset(db as unknown as Db, dataset, { userIds });
+  /** Test hook: switch the signed-in demo user. */
+  signInAs(email: string) {
+    this.currentEmail = email;
   }
-  // Accounts come from the stored auth users so ids stay stable across reloads.
-  const stored = await client.query<{ id: string; email: string }>('select id, email from auth.users');
-  for (const row of stored.rows) {
-    const demoUser = dataset.users.find((u) => u.email === row.email);
-    accounts.set(row.email, {
-      id: row.id,
-      email: row.email,
-      password: DEMO_PASSWORD,
-      displayName: demoUser?.displayName ?? row.email,
-      label: demoUser ? (demoUser.role === 'ADMIN' ? 'S1 admin' : `${demoUser.unitId} commander`) : row.email,
+
+  private async wait<T>(fn: () => T | Promise<T>): Promise<T> {
+    await this.ready;
+    await new Promise((r) => setTimeout(r, LATENCY_MS));
+    return fn();
+  }
+
+  private now(): Date {
+    return this.demoNow ? new Date(this.demoNow) : new Date();
+  }
+
+  private nowIso(): IsoTimestamp {
+    return this.now().toISOString();
+  }
+
+  private today(): IsoDate {
+    return sgDateOf(this.now());
+  }
+
+  private newId(prefix: string): string {
+    return `${prefix}-${String(this.idSeq++).padStart(4, '0')}`;
+  }
+
+  private currentUser(): UserDto {
+    const u = this.currentEmail ? this.data.users.find((x) => x.email === this.currentEmail) : undefined;
+    if (!u) throw new ApiError('UNAUTHORIZED', 'Sign in to continue', 401);
+    return { id: u.id, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' };
+  }
+
+  private unit(unitId: string): UnitDto {
+    const u = this.data.units.find((x) => x.id === unitId);
+    if (!u) throw new ApiError('NOT_FOUND', 'Unit not found', 404);
+    return { ...u, platoons: this.data.platoons.filter((p) => p.unitId === u.id).sort((a, b) => a.sortOrder - b.sortOrder) };
+  }
+
+  private assertPlatoon(unitId: string, platoonId: string | null | undefined) {
+    if (!platoonId) return;
+    if (!this.data.platoons.some((p) => p.id === platoonId && p.unitId === unitId)) throw new ApiError('VALIDATION', 'Choose a platoon of this unit', 400, { field: 'platoonId' });
+  }
+
+  private eventLabel(type: EventDto['type'], name: string | null): string {
+    return type === 'AM' ? 'AM parade' : type === 'PM' ? 'PM parade' : name ?? 'Ad hoc';
+  }
+
+  private eventById(eventId: string): EventDto {
+    const adhoc = this.adhoc.find((e) => e.id === eventId);
+    if (adhoc) return adhoc;
+    const m = /^(\d{4}-\d{2}-\d{2})-(AM|PM)$/.exec(eventId);
+    if (!m) throw new ApiError('NOT_FOUND', 'Event not found', 404);
+    const date = m[1]!;
+    const type = m[2] as 'AM' | 'PM';
+    return { id: eventId, date, type, name: null, cutoffAt: sgLocalToIso(date, type === 'AM' ? this.cutoffs.am : this.cutoffs.pm), label: this.eventLabel(type, null) };
+  }
+
+  private activeSpans(unitId: string): DemoSpan[] {
+    return this.data.spans.filter((s) => s.unitId === unitId);
+  }
+
+  private computeUnit(unitId: string, event: EventDto) {
+    const people = this.data.personnel.filter((p) => p.unitId === unitId);
+    const spans = this.activeSpans(unitId);
+    const marks = new Set(this.data.marks.filter((m) => m.unitId === unitId && m.eventId === event.id).map((m) => m.personId));
+    const statuses = effectiveStatuses(people, spans, marks, event.date);
+    return { statuses, counts: unitCounts(statuses) };
+  }
+
+  private async submissionFor(unitId: string, event: EventDto, hash: string): Promise<{ state: SubmissionState; changes: UnitAttendanceDto['changes']; updatedAt: IsoTimestamp | null }> {
+    const subs = this.data.submissions.filter((s) => s.unitId === unitId && s.eventId === event.id).sort((a, b) => b.version - a.version);
+    const latest = subs[0] ?? null;
+    const activity = this.data.unitEventState.find((s) => s.unitId === unitId && s.eventId === event.id) ?? null;
+    const state = deriveSubmissionState({
+      latest: latest ? { version: latest.version, submittedAt: latest.submittedAt, submittedBy: latest.submittedBy, contentHash: latest.contentHash } : null,
+      activity: activity ? { lastChangedAt: activity.lastChangedAt } : null,
+      cutoffAt: event.cutoffAt,
+      now: this.now(),
+      currentHash: hash,
+    });
+    let changes: UnitAttendanceDto['changes'] = [];
+    if (latest && (state.kind === 'SUBMITTED' || state.kind === 'RESUBMITTED') && state.hasChanges) {
+      const { statuses } = this.computeUnit(unitId, event);
+      changes = diffAgainstSnapshot(latest.snapshot as SnapshotEntry[], statuses);
+    }
+    return { state, changes, updatedAt: activity?.lastChangedAt ?? null };
+  }
+
+  private touch(unitId: UnitId, eventId: string, userId: string) {
+    const at = this.nowIso();
+    const row = this.data.unitEventState.find((s) => s.unitId === unitId && s.eventId === eventId);
+    if (row) {
+      row.lastChangedAt = at;
+      row.lastChangedBy = userId;
+    } else {
+      this.data.unitEventState.push({ unitId, eventId, firstChangedAt: at, lastChangedAt: at, lastChangedBy: userId });
+    }
+    return at;
+  }
+
+  // ---- auth / meta ----
+
+  signIn(email: string, password: string): Promise<void> {
+    return this.wait(() => {
+      const u = this.data.users.find((x) => x.email === email.trim().toLowerCase());
+      if (!u || password !== 'demo1234') throw new ApiError('UNAUTHORIZED', 'Email or password is incorrect.', 401);
+      this.currentEmail = u.email;
     });
   }
 
-  const provider: AuthProvider = {
-    async verifyAccessToken(token) {
-      return token.startsWith('demo:') ? token.slice(5) : null;
-    },
-    async createUser({ email, password, displayName }) {
-      if (accounts.has(email)) throw conflict('An account with that email already exists');
-      const row = await client.query<{ id: string }>('insert into auth.users (id, email) values (gen_random_uuid(), $1) returning id', [email]);
-      const id = row.rows[0]!.id;
-      accounts.set(email, { id, email, password, displayName, label: email });
-      return { id };
-    },
-    async deleteUser(id) {
-      for (const [email, a] of accounts) if (a.id === id) accounts.delete(email);
-      await client.query('delete from auth.users where id = $1', [id]);
-    },
-    async setPassword(id, password) {
-      for (const a of accounts.values()) if (a.id === id) a.password = password;
-    },
-  };
+  signOut(): Promise<void> {
+    return this.wait(() => {
+      this.currentEmail = null;
+    });
+  }
 
-  const app = createApp({ deps: () => ({ db: db as unknown as Db, auth: provider, release: async () => {} }) });
-  const env: Bindings = {
-    DEMO_CONTROLS: 'true',
-    SUPABASE_URL: 'https://demo.invalid',
-    SUPABASE_ANON_KEY: 'demo',
-  };
+  demoAccounts(): Promise<DemoAccount[]> {
+    return this.wait(() => [
+      { email: DEFAULT_EMAIL, label: 'Coy 1 commander', role: 'COMMANDER' },
+      { email: ADMIN_EMAIL, label: 'S1 admin', role: 'ADMIN' },
+    ]);
+  }
 
-  let offline = false;
-  const listeners = new Set<() => void>();
-  const notify = () => listeners.forEach((l) => l());
+  bootstrap(body: BootstrapBody): Promise<UserDto> {
+    return this.wait(() => {
+      const u = { id: this.newId('u'), email: body.email.toLowerCase(), displayName: body.displayName, role: 'ADMIN' as const, unitId: null };
+      this.data.users.push(u);
+      this.currentEmail = u.email;
+      return { ...u, mustChangePassword: false, isActive: true, createdAt: this.nowIso() };
+    });
+  }
 
-  const fetcher: Fetcher = async (input, init) => {
-    if (offline) throw new TypeError('Failed to fetch');
-    // Small delay so the UI's pending states are visible, as on a real network.
-    await new Promise((r) => setTimeout(r, 40));
-    return app.request(input, init, env);
-  };
+  changePassword(): Promise<void> {
+    return this.wait(() => undefined);
+  }
 
-  const sessionListeners = new Set<() => void>();
-  const currentId = () => localStorage.getItem(SESSION_KEY);
-  const session: AuthSession = {
-    async getAccessToken() {
-      const id = currentId();
-      return id ? `demo:${id}` : null;
-    },
-    async isSignedIn() {
-      return currentId() !== null;
-    },
-    async signIn(email, password) {
-      const account = accounts.get(email.trim().toLowerCase());
-      if (!account || account.password !== password) throw new Error('Email or password is wrong');
-      localStorage.setItem(SESSION_KEY, account.id);
-      sessionListeners.forEach((l) => l());
-    },
-    async signOut() {
-      localStorage.removeItem(SESSION_KEY);
-      sessionListeners.forEach((l) => l());
-    },
-    subscribe(listener) {
-      sessionListeners.add(listener);
-      return () => sessionListeners.delete(listener);
-    },
-    demoAccounts: dataset.users.map<DemoAccount>((u) => ({
-      email: u.email,
-      label: u.role === 'ADMIN' ? `${u.displayName} (S1)` : u.displayName,
-      password: DEMO_PASSWORD,
-    })),
-  };
+  subscribeAdminChanges(): () => void {
+    return () => undefined;
+  }
 
-  const demo: DemoControls = {
-    setOffline(value) {
-      if (offline === value) return;
-      offline = value;
-      notify();
-      if (!value) window.dispatchEvent(new Event('parade-state:online'));
-    },
-    isOffline: () => offline,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    async reset() {
-      localStorage.removeItem(SESSION_KEY);
-      await client.close();
-      await new Promise<void>((resolve, reject) => {
-        const req = indexedDB.deleteDatabase('/pglite/parade-state-demo');
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-        req.onblocked = () => resolve();
+  me(): Promise<MeDto> {
+    return this.wait(() => ({
+      user: this.currentUser(),
+      serverNow: this.nowIso(),
+      sgToday: this.today(),
+      demo: { enabled: true, now: this.demoNow },
+    }));
+  }
+
+  units(): Promise<UnitDto[]> {
+    return this.wait(() => this.data.units.map((u) => this.unit(u.id)));
+  }
+
+  createPlatoon(unitId: string, name: string): Promise<PlatoonDto> {
+    return this.wait(() => {
+      const unit = this.unit(unitId);
+      if (unit.platoons.some((p) => p.name.toLowerCase() === name.toLowerCase())) throw new ApiError('CONFLICT', 'A platoon with this name already exists', 409);
+      const p: PlatoonDto = { id: `${unitId}-${this.newId('pl')}`, unitId: unit.id, name, sortOrder: (unit.platoons.at(-1)?.sortOrder ?? -1) + 1 };
+      this.data.platoons.push(p);
+      return p;
+    });
+  }
+
+  renamePlatoon(id: string, name: string): Promise<PlatoonDto> {
+    return this.wait(() => {
+      const p = this.data.platoons.find((x) => x.id === id);
+      if (!p) throw new ApiError('NOT_FOUND', 'Platoon not found', 404);
+      p.name = name;
+      return { ...p };
+    });
+  }
+
+  deletePlatoon(id: string): Promise<void> {
+    return this.wait(() => {
+      if (this.data.personnel.some((x) => x.platoonId === id)) throw new ApiError('CONFLICT', 'Move its personnel to another platoon first', 409);
+      this.data.platoons = this.data.platoons.filter((x) => x.id !== id);
+    });
+  }
+
+  events(date: IsoDate): Promise<EventDto[]> {
+    return this.wait(() => [
+      this.eventById(`${date}-AM`),
+      this.eventById(`${date}-PM`),
+      ...this.adhoc.filter((e) => e.date === date),
+    ]);
+  }
+
+  createAdhocEvent(body: CreateAdhocBody): Promise<EventDto> {
+    return this.wait(() => {
+      const ev: MockAdhoc = { id: `${body.date}-X-${this.newId('ev')}`, date: body.date, type: 'ADHOC', name: body.name, cutoffAt: sgLocalToIso(body.date, body.cutoffTime), label: body.name };
+      this.adhoc.push(ev);
+      // Pre-fill from each unit's last submitted parade state on or before this date.
+      const user = this.currentUser();
+      for (const unit of this.data.units) {
+        const latest = this.data.submissions
+          .filter((s) => s.unitId === unit.id && this.eventById(s.eventId).date <= ev.date && s.submittedAt <= this.nowIso())
+          .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1))[0];
+        if (!latest) continue;
+        const active = new Set(this.data.personnel.filter((p) => p.unitId === unit.id && p.postedInDate <= ev.date && (p.postedOutDate === null || p.postedOutDate > ev.date)).map((p) => p.id));
+        for (const entry of latest.snapshot) {
+          if (entry.status === 'PRESENT' && active.has(entry.personId)) {
+            this.data.marks.push({ eventId: ev.id, personId: entry.personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
+          }
+        }
+      }
+      return ev;
+    });
+  }
+
+  // ---- roll ----
+
+  personnel(unitId: string, includeInactive = false): Promise<PersonDto[]> {
+    return this.wait(() =>
+      this.data.personnel
+        .filter((p) => p.unitId === unitId && (includeInactive || p.postedOutDate === null))
+        .map((p) => ({ id: p.id, unitId: p.unitId, platoonId: p.platoonId, rank: p.rank, name: p.name, serviceNo: p.serviceNo, postedInDate: p.postedInDate, postedOutDate: p.postedOutDate })),
+    );
+  }
+
+  createPerson(unitId: string, body: CreatePersonBody): Promise<PersonDto> {
+    return this.wait(() => {
+      const unit = this.unit(unitId);
+      this.assertPlatoon(unitId, body.platoonId);
+      const p = { id: this.newId('p'), unitId: unit.id, platoonId: body.platoonId ?? null, rank: body.rank, name: body.name.trim(), serviceNo: body.serviceNo ?? null, postedInDate: body.postedInDate ?? this.today(), postedOutDate: null };
+      this.data.personnel.push(p);
+      return { ...p };
+    });
+  }
+
+  updatePerson(unitId: string, personId: string, body: UpdatePersonBody): Promise<PersonDto> {
+    return this.wait(() => {
+      const p = this.data.personnel.find((x) => x.id === personId && x.unitId === unitId);
+      if (!p) throw new ApiError('NOT_FOUND', 'Person not found', 404);
+      if (body.platoonId !== undefined) {
+        this.assertPlatoon(unitId, body.platoonId);
+        p.platoonId = body.platoonId;
+      }
+      if (body.rank !== undefined) p.rank = body.rank;
+      if (body.name !== undefined) p.name = body.name.trim();
+      if (body.serviceNo !== undefined) p.serviceNo = body.serviceNo;
+      if (body.postedOutDate !== undefined) p.postedOutDate = body.postedOutDate;
+      return { ...p };
+    });
+  }
+
+  // ---- attendance ----
+
+  unitAttendance(unitId: string, eventId: string): Promise<UnitAttendanceDto> {
+    return this.wait(async () => {
+      const unit = this.unit(unitId);
+      const event = this.eventById(eventId);
+      const { statuses, counts } = this.computeUnit(unitId, event);
+      const hash = await contentHash(statuses);
+      const sub = await this.submissionFor(unitId, event, hash);
+      const user = this.currentUser();
+      const locked = user.role === 'ADMIN' ? false : isDateLocked(event.date, this.today(), this.unlocks, this.now());
+      return { unit, event, persons: statuses, counts, platoons: platoonBreakdown(statuses, unit.platoons), submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
+    });
+  }
+
+  mark(unitId: string, eventId: string, personId: string, body: MarkBody): Promise<MarkResultDto> {
+    return this.wait(async () => {
+      const unit = this.unit(unitId);
+      const event = this.eventById(eventId);
+      const user = this.currentUser();
+      if (user.role !== 'ADMIN' && isDateLocked(event.date, this.today(), this.unlocks, this.now())) {
+        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 to unlock it to make corrections.', 403);
+      }
+      const person = this.data.personnel.find((p) => p.id === personId && p.unitId === unitId);
+      if (!person) throw new ApiError('NOT_FOUND', 'Person not found in this unit', 404);
+      let plan;
+      try {
+        plan = planMark(body, personId, this.activeSpans(unitId), event.date);
+      } catch (e) {
+        if (e instanceof MarkValidationError) throw new ApiError('VALIDATION', e.message, 400, { field: e.field });
+        throw e;
+      }
+      const nowIso = this.nowIso();
+      this.data.spans = this.data.spans.filter((s) => !plan.supersedeSpanIds.includes(s.id));
+      for (const ns of plan.insertSpans) {
+        this.data.spans.push({ id: this.newId('span'), unitId: unit.id, personId: ns.personId, status: ns.status as AbsenceStatus, subType: ns.subType, startDate: ns.startDate, endDate: ns.endDate, remark: ns.remark, createdAt: nowIso, createdBy: user.id });
+      }
+      if (plan.deleteMarksInRange) {
+        const { start, end } = plan.deleteMarksInRange;
+        this.data.marks = this.data.marks.filter((m) => {
+          if (m.personId !== personId) return true;
+          const d = this.eventById(m.eventId).date;
+          return !(d >= start && (end === null || d <= end));
+        });
+      }
+      if (plan.upsertPresentMark && !this.data.marks.some((m) => m.personId === personId && m.eventId === eventId)) {
+        this.data.marks.push({ eventId, personId, unitId: unit.id, markedBy: user.id, markedAt: nowIso });
+      }
+      const updatedAt = this.touch(unit.id, eventId, user.id);
+      const { statuses, counts } = this.computeUnit(unitId, event);
+      const hash = await contentHash(statuses);
+      const sub = await this.submissionFor(unitId, event, hash);
+      const row = statuses.find((s) => s.personId === personId)!;
+      return { person: row, counts, submission: sub.state, changes: sub.changes, updatedAt, contentHash: hash };
+    });
+  }
+
+  markRemainingPresent(unitId: string, eventId: string): Promise<UnitAttendanceDto> {
+    return this.wait(async () => {
+      const unit = this.unit(unitId);
+      const event = this.eventById(eventId);
+      const user = this.currentUser();
+      if (user.role !== 'ADMIN' && isDateLocked(event.date, this.today(), this.unlocks, this.now())) {
+        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 to unlock it to make corrections.', 403);
+      }
+      const { statuses } = this.computeUnit(unitId, event);
+      const ids = planMarkRemainingPresent(statuses);
+      for (const personId of ids) this.data.marks.push({ eventId, personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
+      if (ids.length) this.touch(unit.id, eventId, user.id);
+      return this.unitAttendance(unitId, eventId);
+    });
+  }
+
+  submit(unitId: string, eventId: string): Promise<SubmissionDto> {
+    return this.wait(async () => {
+      const unit = this.unit(unitId);
+      const event = this.eventById(eventId);
+      const user = this.currentUser();
+      const { statuses, counts } = this.computeUnit(unitId, event);
+      if (counts.unmarked > 0) throw new ApiError('VALIDATION', `${counts.unmarked} ${counts.unmarked === 1 ? 'person is' : 'people are'} not yet marked. Mark everyone before submitting.`, 400);
+      const hash = await contentHash(statuses);
+      const existing = this.data.submissions.filter((s) => s.unitId === unitId && s.eventId === eventId).sort((a, b) => b.version - a.version);
+      const latest = existing[0];
+      if (latest && latest.contentHash === hash) throw new ApiError('CONFLICT', 'Nothing has changed since the last submission.', 409);
+      const version = (latest?.version ?? 0) + 1;
+      const submittedAt = this.nowIso();
+      const sub = { id: this.newId('sub'), unitId: unit.id, eventId, version, submittedBy: user.id, submittedAt, contentHash: hash, counts, snapshot: toSnapshot(statuses) };
+      this.data.submissions.push(sub);
+      const admin = this.data.users.find((u) => u.role === 'ADMIN')!;
+      const label = version === 1 ? 'submitted' : `resubmitted (v${version})`;
+      this.data.notifications.unshift({ id: this.newId('n'), userId: admin.id, type: version === 1 ? 'SUBMITTED' : 'RESUBMITTED', unitId: unit.id, eventId, submissionId: sub.id, message: `${unit.name} ${label} ${event.label} · ${counts.present}/${counts.strength} present`, createdAt: submittedAt, readAt: null });
+      return { id: sub.id, unitId: unit.id, eventId, version, submittedAt, submittedBy: user.id, submittedByName: user.displayName, counts, contentHash: hash };
+    });
+  }
+
+  submissions(unitId: string, eventId: string): Promise<SubmissionDto[]> {
+    return this.wait(() =>
+      this.data.submissions
+        .filter((s) => s.unitId === unitId && s.eventId === eventId)
+        .sort((a, b) => b.version - a.version)
+        .map((s) => ({ id: s.id, unitId: s.unitId, eventId: s.eventId, version: s.version, submittedAt: s.submittedAt, submittedBy: s.submittedBy, submittedByName: this.data.users.find((u) => u.id === s.submittedBy)?.displayName ?? 'Unknown', counts: s.counts, contentHash: s.contentHash })),
+    );
+  }
+
+  // ---- admin ----
+
+  summary(eventId: string): Promise<BattalionSummaryDto> {
+    return this.wait(() => this.buildSummary(this.eventById(eventId)));
+  }
+
+  private async buildSummary(event: EventDto): Promise<BattalionSummaryDto> {
+    const rows = [];
+    for (const u of this.data.units) {
+      const unit = this.unit(u.id);
+      const { statuses, counts } = this.computeUnit(unit.id, event);
+      const hash = await contentHash(statuses);
+      const sub = await this.submissionFor(unit.id, event, hash);
+      rows.push({ unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) });
+    }
+    this.ensureLateNotifications(event);
+    rows.sort((a, b) => awaitingRank(a.submission) - awaitingRank(b.submission) || a.unit.sortOrder - b.unit.sortOrder);
+    const submitted = rows.filter((r) => r.submission.kind === 'SUBMITTED' || r.submission.kind === 'RESUBMITTED').length;
+    return { event, totals: sumCounts(rows.map((r) => r.counts)), unitsSubmitted: submitted, unitsTotal: rows.length, units: rows, serverNow: this.nowIso() };
+  }
+
+  private loadPast(event: EventDto, days: number, unitId?: string) {
+    const pastDates = new Set(trendDates(event.date, days).filter((d) => d !== event.date));
+    const pastEvents = this.data.events.filter((e) => e.type === 'AM' && pastDates.has(e.date)).map((e) => ({ id: e.id, date: e.date, cutoffAt: e.cutoffAt }));
+    const pastIds = new Set(pastEvents.map((e) => e.id));
+    const latest = new Map<string, TrendSubmission & { version: number }>();
+    for (const s of this.data.submissions) {
+      if (!pastIds.has(s.eventId) || s.submittedAt > this.nowIso() || (unitId && s.unitId !== unitId)) continue;
+      const key = `${s.unitId}|${s.eventId}`;
+      const cur = latest.get(key);
+      if (!cur || s.version > cur.version) latest.set(key, { unitId: s.unitId, eventId: s.eventId, submittedAt: s.submittedAt, counts: s.counts, version: s.version });
+    }
+    return { pastEvents, submissions: [...latest.values()] };
+  }
+
+  trends(eventId: string, days = 14): Promise<TrendsDto> {
+    return this.wait(async () => {
+      const event = this.eventById(eventId);
+      const summary = await this.buildSummary(event);
+      return buildTrends({
+        event,
+        days,
+        units: this.data.units.map((u) => ({ id: u.id, name: u.name, sortOrder: u.sortOrder })),
+        ...this.loadPast(event, days),
+        today: { units: summary.units, totals: summary.totals, unitsSubmitted: summary.unitsSubmitted, unitsTotal: summary.unitsTotal },
+        todayStatuses: this.data.units.flatMap((u) => this.computeUnit(u.id, event).statuses),
+        serverNow: this.nowIso(),
       });
-      location.reload();
-    },
-  };
+    });
+  }
 
-  return { fetcher, session, demo };
+  unitTrends(unitId: string, eventId: string, days = 14): Promise<TrendsDto> {
+    return this.wait(async () => {
+      const event = this.eventById(eventId);
+      const unit = this.unit(unitId);
+      const { statuses, counts } = this.computeUnit(unitId, event);
+      const sub = await this.submissionFor(unitId, event, await contentHash(statuses));
+      const row = { unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) };
+      return buildTrends({
+        event,
+        days,
+        units: [{ id: unit.id, name: unit.name, sortOrder: unit.sortOrder }],
+        ...this.loadPast(event, days, unitId),
+        today: { units: [row], totals: counts, unitsSubmitted: sub.state.kind === 'SUBMITTED' || sub.state.kind === 'RESUBMITTED' ? 1 : 0, unitsTotal: 1 },
+        todayStatuses: statuses,
+        serverNow: this.nowIso(),
+      });
+    });
+  }
+
+  private ensureLateNotifications(event: EventDto) {
+    if (this.now().getTime() < Date.parse(event.cutoffAt)) return;
+    const admin = this.data.users.find((u) => u.role === 'ADMIN')!;
+    for (const unit of this.data.units) {
+      const submitted = this.data.submissions.some((s) => s.unitId === unit.id && s.eventId === event.id);
+      const already = this.data.notifications.some((n) => n.type === 'LATE' && n.unitId === unit.id && n.eventId === event.id);
+      if (!submitted && !already) {
+        this.data.notifications.unshift({ id: this.newId('n'), userId: admin.id, type: 'LATE', unitId: unit.id, eventId: event.id, submissionId: null, message: `${unit.name} has not submitted ${event.label} · cut-off ${formatSgTime(event.cutoffAt)}`, createdAt: event.cutoffAt, readAt: null });
+      }
+    }
+  }
+
+  absentees(eventId: string): Promise<AbsenteesDto> {
+    return this.wait(() => {
+      const event = this.eventById(eventId);
+      const order: AbsenceStatus[] = ['MC', 'LL', 'MA', 'RSI', 'OTHERS'];
+      const groups = order.map((status) => ({ status, items: [] as AbsenteesDto['groups'][number]['items'] }));
+      for (const unit of this.data.units) {
+        const { statuses } = this.computeUnit(unit.id, event);
+        for (const s of statuses) {
+          if (s.status === 'PRESENT' || s.status === 'UNMARKED') continue;
+          groups.find((g) => g.status === s.status)!.items.push({ personId: s.personId, rank: s.rank, name: s.name, unitId: unit.id, unitName: unit.name, status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark });
+        }
+      }
+      const total = groups.reduce((n, g) => n + g.items.length, 0);
+      return { event, total, groups: groups.filter((g) => g.items.length > 0) };
+    });
+  }
+
+  exportUrl(eventId: string, format: 'xlsx' | 'csv'): string {
+    return `/api/admin/export/${eventId}.${format}`;
+  }
+
+  download(eventId: string, format: 'xlsx' | 'csv'): Promise<Blob> {
+    return this.wait(async () => {
+      const abs = await this.absentees(eventId);
+      const lines = [['Unit', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark'].join(',')];
+      for (const g of abs.groups) for (const i of g.items) lines.push([i.unitName, i.rank, i.name, i.status, i.subType ?? '', i.startDate ?? '', i.endDate ?? '', JSON.stringify(i.remark ?? '')].join(','));
+      return new Blob([`\uFEFF${lines.join('\r\n')}`], { type: format === 'csv' ? 'text/csv' : 'application/octet-stream' });
+    });
+  }
+
+  notifications(): Promise<NotificationsDto> {
+    return this.wait(() => {
+      const items = this.data.notifications.map((n) => ({ id: n.id, type: n.type, unitId: n.unitId, unitName: this.unit(n.unitId).name, eventId: n.eventId, message: n.message, createdAt: n.createdAt, readAt: n.readAt }));
+      return { items, unreadCount: items.filter((n) => !n.readAt).length };
+    });
+  }
+
+  markNotificationsRead(ids: string[] | 'all'): Promise<void> {
+    return this.wait(() => {
+      const at = this.nowIso();
+      for (const n of this.data.notifications) if (!n.readAt && (ids === 'all' || ids.includes(n.id))) n.readAt = at;
+    });
+  }
+
+  users(): Promise<UserDto[]> {
+    return this.wait(() => this.data.users.map((u) => ({ id: u.id, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' })));
+  }
+
+  createUser(body: CreateUserBody): Promise<UserDto> {
+    return this.wait(() => {
+      if (this.data.users.some((u) => u.email === body.email.toLowerCase())) throw new ApiError('CONFLICT', 'An account with this email already exists', 409);
+      const u = { id: this.newId('u'), email: body.email.toLowerCase(), displayName: body.displayName, role: body.role, unitId: (body.unitId as UnitId | null) ?? null };
+      this.data.users.push(u);
+      return { ...u, mustChangePassword: true, isActive: true, createdAt: this.nowIso() };
+    });
+  }
+
+  updateUser(id: string, body: UpdateUserBody): Promise<UserDto> {
+    return this.wait(() => {
+      const u = this.data.users.find((x) => x.id === id);
+      if (!u) throw new ApiError('NOT_FOUND', 'User not found', 404);
+      if (body.displayName !== undefined) u.displayName = body.displayName;
+      if (body.unitId !== undefined) u.unitId = body.unitId as UnitId | null;
+      return { ...u, mustChangePassword: false, isActive: body.isActive ?? true, createdAt: '2026-08-01T00:00:00.000Z' };
+    });
+  }
+
+  resetPassword(): Promise<void> {
+    return this.wait(() => undefined);
+  }
+
+  settings(): Promise<SettingsDto> {
+    return this.wait(() => ({ cutoffAm: this.cutoffs.am, cutoffPm: this.cutoffs.pm, dateUnlocks: [...this.unlocks] }));
+  }
+
+  updateSettings(body: { cutoffAm?: string; cutoffPm?: string }): Promise<SettingsDto> {
+    return this.wait(() => {
+      if (body.cutoffAm) this.cutoffs.am = body.cutoffAm;
+      if (body.cutoffPm) this.cutoffs.pm = body.cutoffPm;
+      return { cutoffAm: this.cutoffs.am, cutoffPm: this.cutoffs.pm, dateUnlocks: [...this.unlocks] };
+    });
+  }
+
+  unlockDate(date: IsoDate): Promise<SettingsDto> {
+    return this.wait(() => {
+      this.unlocks = this.unlocks.filter((u) => u.date !== date);
+      this.unlocks.push({ date, unlockedBy: this.currentUser().displayName, expiresAt: new Date(this.now().getTime() + 24 * 3600_000).toISOString() });
+      return { cutoffAm: this.cutoffs.am, cutoffPm: this.cutoffs.pm, dateUnlocks: [...this.unlocks] };
+    });
+  }
+
+  relockDate(date: IsoDate): Promise<SettingsDto> {
+    return this.wait(() => {
+      this.unlocks = this.unlocks.filter((u) => u.date !== date);
+      return { cutoffAm: this.cutoffs.am, cutoffPm: this.cutoffs.pm, dateUnlocks: [...this.unlocks] };
+    });
+  }
+
+  demoClock(): Promise<IsoTimestamp | null> {
+    return this.wait(() => this.demoNow);
+  }
+
+  setDemoClock(now: IsoTimestamp | null): Promise<void> {
+    return this.wait(() => {
+      this.demoNow = now;
+    });
+  }
+
+  /** Test hook: move the demo clock by whole days without changing the time of day. */
+  shiftDemoDate(days: number) {
+    if (!this.demoNow) return;
+    const d = sgDateOf(this.demoNow);
+    this.demoNow = sgLocalToIso(addDays(d, days), formatSgTime(this.demoNow));
+  }
+
+  static readonly ADMIN_EMAIL = ADMIN_EMAIL;
+  static readonly DEFAULT_EMAIL = DEFAULT_EMAIL;
 }

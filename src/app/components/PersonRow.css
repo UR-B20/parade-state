@@ -1,0 +1,133 @@
+.roll {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  overflow: hidden;
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--row-h);
+  padding: 8px 12px 8px var(--pad-x);
+  border-bottom: 1px solid var(--line);
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.person--unmarked {
+  background: var(--surface);
+}
+
+.person__body {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  text-align: left;
+  border-radius: var(--radius-s);
+  padding: 4px 0;
+}
+
+.person__body:hover:not(:disabled) .person__name {
+  color: var(--primary);
+}
+
+.person__body:disabled {
+  cursor: default;
+}
+
+.person__name {
+  font-size: var(--fs-body-lg);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.person__meta {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  min-height: 18px;
+}
+
+.person__rank {
+  font-weight: 600;
+  color: var(--text-2);
+  flex: none;
+}
+
+.person__detail {
+  min-width: 0;
+}
+
+.person__side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.person__pill {
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+}
+
+.person__pill:disabled {
+  cursor: default;
+}
+
+/* Two-way choice for unmarked personnel. */
+.person__choice {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.choice {
+  min-height: 44px;
+  min-width: 48px;
+  padding: 0 12px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.choice--present {
+  color: var(--present);
+  border-color: var(--present);
+}
+
+.choice--present:hover {
+  background: var(--present-tint);
+}
+
+.choice--absent:hover {
+  background: var(--surface-2);
+}
+
+.person__pending {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: person-pulse 1s ease-in-out infinite;
+}
+
+@keyframes person-pulse {
+  50% { opacity: 0.3; }
+}

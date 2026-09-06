@@ -1,37 +1,65 @@
-/** Cloudflare Worker entry: the API on postgres-js and Supabase, plus the scheduled handler. */
-import { createApp } from './app';
-import { supabaseAuthProvider } from './auth/supabase';
-import { connect } from './db/client';
-import type { Db, DepsFactory } from './deps';
-import { isDatabaseConfigured, type Bindings } from './env';
-import { AppError } from './errors';
+import { Hono } from 'hono';
+import type { Bindings } from './env';
+import { demoControlsEnabled } from './env';
+import { handleError, notFound } from './errors';
+import type { ConfigDto } from '@shared/types';
+import { defaultDeps, type AppDeps } from './deps';
+import { withDb, type AppEnv } from './auth/middleware';
+import { authRoutes } from './routes/auth';
+import { adminUserRoutes } from './routes/adminUsers';
+import { adminSettingsRoutes } from './routes/adminSettings';
+import { eventRoutes, unitRoutes } from './routes/events';
+import { rollRoutes } from './routes/roll';
+import { attendanceRoutes } from './routes/attendance';
+import { submissionRoutes } from './routes/submissions';
+import { notificationRoutes } from './routes/notifications';
+import { runScheduled } from './scheduled';
+import { adminRoutes } from './routes/admin';
+import { profileCount } from './services/users';
 
-export { createApp } from './app';
+export type { AppEnv };
 
-/** A database handle that fails loudly on first use when no database is configured. */
-const unconfiguredDb = new Proxy({} as Db, {
-  get() {
-    throw new AppError('INTERNAL', 'Database is not configured: bind HYPERDRIVE or set SUPABASE_DB_URL');
-  },
-});
+export function createApp(deps: AppDeps = defaultDeps) {
+  const app = new Hono<AppEnv>().basePath('/api');
 
-export const workerDeps: DepsFactory = (env) => {
-  if (!isDatabaseConfigured(env)) {
-    return { db: unconfiguredDb, auth: supabaseAuthProvider(env), release: async () => {} };
-  }
-  const { sql, db } = connect(env);
-  return {
-    db: db as unknown as Db,
-    auth: supabaseAuthProvider(env),
-    release: () => sql.end({ timeout: 5 }),
-  };
-};
+  app.onError(handleError);
+  app.notFound((c) => {
+    throw notFound(`Route ${c.req.method} ${c.req.path}`);
+  });
 
-const app = createApp({ deps: workerDeps });
+  app.get('/health', (c) => c.json({ ok: true, now: deps.now().toISOString() }));
+
+  app.use('*', withDb(deps));
+
+  app.get('/config', async (c) => {
+    const body: ConfigDto = {
+      supabaseUrl: c.env.SUPABASE_URL ?? '',
+      anonKey: c.env.SUPABASE_ANON_KEY ?? '',
+      demoControls: demoControlsEnabled(c.env),
+      needsBootstrap: (await profileCount(c.get('db'))) === 0,
+    };
+    return c.json(body);
+  });
+
+  app.route('/auth', authRoutes);
+  app.route('/events', eventRoutes);
+  app.route('/units', unitRoutes);
+  app.route('/units/:unitId/personnel', rollRoutes);
+  app.route('/units/:unitId/attendance', attendanceRoutes);
+  app.route('/units/:unitId/submissions', submissionRoutes);
+  app.route('/notifications', notificationRoutes);
+  app.route('/admin/users', adminUserRoutes);
+  app.route('/admin', adminRoutes);
+  app.route('/admin', adminSettingsRoutes);
+
+  return app;
+}
+
+const app = createApp();
 
 export default {
   fetch: app.fetch,
-  async scheduled(_controller: ScheduledController, _env: Bindings, _ctx: ExecutionContext) {
-    // Late notifications + Supabase keep-alive are wired in a later milestone.
+  async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduled(env, defaultDeps).then((r) => console.log('scheduled run', JSON.stringify(r))));
   },
 } satisfies ExportedHandler<Bindings>;

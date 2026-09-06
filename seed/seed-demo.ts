@@ -1,68 +1,75 @@
 /**
- * Load the fictional demo battalion into a Supabase project.
+ * Loads the fictional battalion into a Supabase project for review or a demo deployment.
  *
- *   pnpm seed:demo
+ * Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_DB_URL_MIGRATIONS (session pooler)
+ * or SUPABASE_DB_URL. Creates the demo auth users (password demo1234) if they do not exist,
+ * then inserts personnel, absences, marks, submissions and notifications for Sun 6 Sep 2026
+ * and sets the demo clock to 09:24. Idempotent: existing rows are left alone.
  *
- * Refuses to run unless DEMO_CONTROLS=true, so it cannot be pointed at production by accident.
- * Replaces all application data: existing demo auth users (any address at the demo domain)
- * are deleted and recreated with the demo password.
+ * Run: pnpm seed:demo            (or: npx tsx seed/seed-demo.ts --reset to wipe demo rows first)
  */
-import { createClient } from '@supabase/supabase-js';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { buildDemoDataset, DEMO_EMAIL_DOMAIN, DEMO_PASSWORD } from '../src/shared/demo/dataset';
-import { demoControlsEnabled } from '../src/worker/env';
+import { inArray, sql } from 'drizzle-orm';
+import { buildDemoDataset, DEMO_PASSWORD } from '../src/shared/demo/dataset';
+import { createSupabaseAuthAdmin } from '../src/worker/auth/supabaseAdmin';
+import { insertDemoData } from '../src/worker/db/seedDemo';
 import * as schema from '../src/worker/db/schema';
-import { loadDevVars, migrationsDatabaseUrl, requireEnv } from '../scripts/lib/env';
-import { loadDemoDataset, resetAppData } from './load';
+import { createClient } from '@supabase/supabase-js';
 
-loadDevVars();
-
-if (!demoControlsEnabled(process.env)) {
-  console.error('Refusing to seed: DEMO_CONTROLS is not "true". The demo seed is for local and staging databases only.');
+const url = process.env.SUPABASE_DB_URL_MIGRATIONS ?? process.env.SUPABASE_DB_URL;
+const supabaseUrl = process.env.SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!url || !supabaseUrl || !serviceKey) {
+  console.error('Set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_DB_URL_MIGRATIONS (or SUPABASE_DB_URL).');
   process.exit(1);
 }
+const reset = process.argv.includes('--reset');
 
-const supabase = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-const sql = postgres(migrationsDatabaseUrl(), { max: 1, prepare: false, onnotice: () => {} });
-const db = drizzle(sql, { schema });
+const sqlClient = postgres(url, { max: 1, prepare: false });
+const db = drizzle(sqlClient, { schema });
+const authAdmin = createSupabaseAuthAdmin({ SUPABASE_URL: supabaseUrl, SUPABASE_SERVICE_ROLE_KEY: serviceKey });
+const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+async function findAuthUserId(email: string): Promise<string | null> {
+  // Paginate through auth users (small demo set) to find an existing account by email.
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw new Error(error.message);
+    const hit = data.users.find((u) => u.email?.toLowerCase() === email);
+    if (hit) return hit.id;
+    if (data.users.length < 200) break;
+  }
+  return null;
+}
 
 try {
-  const dataset = await buildDemoDataset();
-  console.log(`Demo battalion: ${dataset.units.length} units, ${dataset.personnel.length} personnel, ${dataset.users.length} users`);
-
-  console.log('Clearing application data');
-  await resetAppData(db);
-
-  console.log('Recreating demo auth users');
-  const existing = await supabase.auth.admin.listUsers({ perPage: 1000 });
-  if (existing.error) throw existing.error;
-  for (const user of existing.data.users) {
-    if (user.email?.endsWith(`@${DEMO_EMAIL_DOMAIN}`)) {
-      const { error } = await supabase.auth.admin.deleteUser(user.id);
-      if (error) throw error;
-    }
+  const data = await buildDemoDataset();
+  if (reset) {
+    console.log('Removing existing demo rows…');
+    const personIds = data.personnel.map((p) => p.id);
+    await db.delete(schema.notifications).where(inArray(schema.notifications.eventId, data.events.map((e) => e.id)));
+    await db.delete(schema.submissions).where(inArray(schema.submissions.eventId, data.events.map((e) => e.id)));
+    await db.delete(schema.unitEventState).where(inArray(schema.unitEventState.eventId, data.events.map((e) => e.id)));
+    await db.delete(schema.eventMarks).where(inArray(schema.eventMarks.personId, personIds));
+    await db.delete(schema.statusSpans).where(inArray(schema.statusSpans.personId, personIds));
+    await db.delete(schema.personnel).where(inArray(schema.personnel.id, personIds));
   }
 
   const userIds = new Map<string, string>();
-  for (const user of dataset.users) {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: user.email,
-      password: DEMO_PASSWORD,
-      email_confirm: true,
-      user_metadata: { display_name: user.displayName },
-    });
-    if (error) throw error;
-    userIds.set(user.id, data.user.id);
+  for (const u of data.users) {
+    let id = await findAuthUserId(u.email);
+    if (!id) {
+      ({ id } = await authAdmin.createUser({ email: u.email, password: DEMO_PASSWORD, displayName: u.displayName }));
+      console.log('created auth user', u.email);
+    }
+    userIds.set(u.id, id);
   }
 
-  console.log('Inserting rows');
-  await loadDemoDataset(db, dataset, { userIds });
-
-  console.log(`Done. Sign in as any demo user with password "${DEMO_PASSWORD}":`);
-  for (const user of dataset.users) console.log(`  ${user.email.padEnd(32)} ${user.role}${user.unitId ? ` ${user.unitId}` : ''}`);
+  await insertDemoData(db, data, userIds);
+  const countRows = await db.execute<{ n: number }>(sql`select count(*)::int as n from personnel`);
+  console.log(`Demo battalion loaded. Personnel rows: ${countRows[0]?.n ?? '?'}. Demo clock set to ${data.now} (09:24 SGT, 6 Sep 2026).`);
+  console.log(`Sign in with any demo account and the password "${DEMO_PASSWORD}", e.g. cdr.coy1@parade-state.demo or s1admin@parade-state.demo.`);
 } finally {
-  await sql.end();
+  await sqlClient.end({ timeout: 5 });
 }

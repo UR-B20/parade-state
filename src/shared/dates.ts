@@ -1,5 +1,5 @@
 /**
- * All dates in Parade State are civil dates in Asia/Singapore (UTC+08:00, no DST),
+ * All dates in SoldierTrack are civil dates in Asia/Singapore (UTC+08:00, no DST),
  * written as 'YYYY-MM-DD'. All timestamps are ISO-8601 UTC strings.
  * These helpers do fixed-offset arithmetic so they behave identically in the
  * Worker, the browser and Node tests.

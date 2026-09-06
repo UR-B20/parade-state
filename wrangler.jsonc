@@ -12,7 +12,8 @@
   },
   "vars": {
     // Set to "true" only on a demo or staging deployment. Enables the demo clock,
-    // simulated offline controls and one-tap demo sign-in.
+    // simulated offline controls and one-tap demo sign-in. The real-roll deployment keeps
+    // this "false" and is never seeded: the roll is built by S1 and the commanders.
     "DEMO_CONTROLS": "false"
   },
   // Secrets (set with `wrangler secret put` or in the Cloudflare dashboard):
