@@ -53,4 +53,25 @@ else answers 403 with code `PASSWORD_CHANGE_REQUIRED`. Commanders asking for ano
 3. Sign in with that email and the bootstrap password, change it when prompted.
 4. Delete the `BOOTSTRAP_ADMIN_PASSWORD` secret from the Worker.
 
+## Client
+
+React 19 with React Router, TanStack Query persisted to IndexedDB, and Supabase Auth for sign-in.
+Every mark and submission goes through an offline queue (`src/app/offline/queue.ts`): it is written
+to IndexedDB first, applied to the screen at once, and replayed in order when the server answers.
+A service worker (`public/sw.js`) keeps the app shell available without signal; it never caches `/api`.
+
+```sh
+pnpm dev          # Worker + client on http://localhost:5173, needs .dev.vars and a Supabase project
+pnpm dev:mock     # the same app on the in-browser demo backend, no Supabase needed
+pnpm test:e2e     # Playwright on a phone-sized Chromium against the demo build
+```
+
+### Demo backend
+
+`VITE_MOCK_API=1` swaps the network for the real Hono API running in the browser on PGlite,
+migrated and seeded with the fictional battalion. Sign in with one tap on the sign-in screen (every
+demo account uses the password `demo1234`), simulate losing signal from the demo bar, and reset the
+data at any time. The demo clock is frozen at Sun 6 Sep 2026, 09:24. Production builds do not
+contain any of this.
+
 Deployment steps are added in a later milestone.

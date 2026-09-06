@@ -1,6 +1,6 @@
 # Parade State: go-live plan
 
-Status as of 6 Sep 2026 (M1 and M2 closed the same day). This document is the working plan for taking Parade State from the
+Status as of 6 Sep 2026 (M1 to M3 closed the same day). This document is the working plan for taking Parade State from the
 current scaffold to a production deployment used by a battalion every parade day. Update it as
 milestones close.
 
@@ -13,12 +13,12 @@ Verified against the `main` branch (one commit, "Scaffold Parade State"):
 | Toolchain | Works | `pnpm install`, `pnpm typecheck` and `pnpm build` all pass; the Worker and client bundles build cleanly. |
 | Shared domain | Done | Effective status precedence, counts, canonical hash, submission state, diff, date lock and Singapore date helpers in `src/shared`. |
 | Demo dataset | Done | Deterministic battalion of 312 personnel in 8 units; `scripts/check-demo.ts` reconciles counts (287 present, 25 absent) and unique names. |
-| Worker API | Auth done (M2) | Health, config with real `needsBootstrap`, bootstrap, me, change-password, units, unit roll, S1 account management. Attendance routes are M3. Scheduled handler is empty. |
+| Worker API | Commander flow done (M3) | Auth and accounts (M2) plus events, attendance, mark, submit and history with the date lock. S1 summary, absentees, notifications and settings routes are M4. Scheduled handler is empty. |
 | Database | Done (M1) | Drizzle schema, two migrations (generated schema plus hand-written security), `pnpm db:migrate`, `pnpm seed:demo`, Worker client with `prepare: false`, RLS and policies on all 11 tables. |
 | Auth | Done (M2) | Supabase tokens verified with `jose` (JWKS, HS256 fallback), profile loaded per request, must-change-password gate, admin and unit access checks. |
-| Client UI | Placeholder | `main.tsx` renders the text "Parade State". No router, no query client, no offline persistence wired. |
-| PWA assets | Missing | `index.html` links `manifest.webmanifest`, `favicon.svg` and `apple-touch-icon.png`; there is no `public/` directory, so all three 404. |
-| Tests | Started | 55 integration tests: migrations and seed against the brief's counts on PGlite, the auth and account API end to end, token verification for both signing schemes, the Supabase admin calls against a stubbed fetch. Domain unit tests and e2e are still M6. |
+| Client UI | Commander flow done (M3) | Sign-in, change password, bootstrap, unit roll with status bands, mark sheet, review with diff, submit, history. Query cache persisted to IndexedDB; offline queue replays marks and submissions in order. S1 screens are M4. |
+| PWA assets | Done (M3) | Manifest, icons and a service worker that serves the shell offline and never caches `/api`. |
+| Tests | Started | 76 integration tests (migrations and seed, auth and accounts, attendance and date lock, token verification, Supabase admin calls) plus 3 Playwright tests on a phone-sized Chromium against the in-browser demo backend. Domain unit tests and CI are M6. |
 | CI/CD | None | No `.github/workflows`. Deploys would be manual `wrangler deploy`. |
 | Environments | None | No Cloudflare Worker or Supabase project provisioned; no secrets set. |
 
@@ -70,7 +70,7 @@ Exit check: an S1 admin can be bootstrapped on an empty database, create a comma
 
 Result: covered end to end in `src/test/integration/auth.test.ts` against the API on PGlite with an in-memory auth provider, and `token.test.ts` verifies real ES256 and HS256 tokens with `jose`. The Supabase Admin API calls themselves are not exercised until staging exists (M7). The sign-in and change-password screens are built in M3 with the rest of the client.
 
-### M3. Commander flow (about 2 weeks)
+### M3. Commander flow (about 2 weeks) - done
 
 - API: `GET /api/units/:unitId/events/:eventId/attendance`, `POST .../persons/:personId/mark` (`MarkBody`), `POST .../submit`, `GET /api/events?date=`. Every write recomputes counts, hash, submission state and diff and returns `MarkResultDto`.
 - Date lock enforced server side with `DATE_LOCKED`; ad hoc events and AM/PM events created per date on first access using the cutoffs in `settings`.
@@ -80,6 +80,8 @@ Result: covered end to end in `src/test/integration/auth.test.ts` against the AP
 - Add `public/` with `manifest.webmanifest`, `favicon.svg`, `apple-touch-icon.png` and a service worker that precaches the shell (network-first for `/api/*`).
 
 Exit check: a commander can mark and submit Coy 1 on a phone in airplane mode, reconnect, and see the submission recorded with a version number.
+
+Result: `src/test/e2e/commander.spec.ts` does exactly this on the iPhone 14 profile against the demo backend (the real API on PGlite in the browser): sign in, lose signal, mark Amir Rahman MC, submit, regain signal, watch the queue drain and version 1 appear in the history, then reload and find it all still there. Airplane mode itself is simulated by the demo bar; the same queue path runs against the real network. Not yet tried on a physical phone against Supabase, which waits for staging (M7). Left for later: a one-tap "confirm everyone present" and ad hoc event creation by S1 (M4).
 
 ### M4. S1 flow (about 1.5 weeks)
 

@@ -1,0 +1,116 @@
+/*
+ * Parade State design tokens. Mobile first, one-handed use on a phone in camp.
+ * Neutrals lean cool green-grey; the accent is a field olive; each attendance status
+ * has its own hue so a band reads at a glance. Dark theme follows the system.
+ */
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --paper: #f3f4f0;
+  --surface: #ffffff;
+  --surface-2: #e9ebe4;
+  --ink: #1b1f1a;
+  --ink-2: #4c534a;
+  --ink-3: #7d857a;
+  --rule: #d6dad1;
+  --rule-strong: #b3b9ae;
+
+  --accent: #4e6142;
+  --accent-strong: #3d4d33;
+  --on-accent: #ffffff;
+  --accent-soft: #e3ead9;
+  --focus: #7a9a63;
+
+  --danger: #b4362a;
+  --danger-soft: #f6dfdb;
+  --warn: #a86a12;
+  --warn-soft: #f7e9d2;
+  --ok: #2e7a4a;
+  --ok-soft: #dfefe3;
+  --info: #2f5f9e;
+  --info-soft: #dde8f6;
+
+  /* Attendance statuses. */
+  --st-present: #2e7a4a;
+  --st-present-soft: #dfefe3;
+  --st-mc: #b4362a;
+  --st-mc-soft: #f6dfdb;
+  --st-ll: #a86a12;
+  --st-ll-soft: #f7e9d2;
+  --st-ma: #2f5f9e;
+  --st-ma-soft: #dde8f6;
+  --st-rsi: #6e3fa3;
+  --st-rsi-soft: #ebe1f6;
+  --st-others: #5a6360;
+  --st-others-soft: #e5e9e6;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+  --shadow-sheet: 0 -8px 32px rgba(20, 24, 18, 0.18);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --text-xs: 0.75rem;
+  --text-s: 0.875rem;
+  --text-m: 1rem;
+  --text-l: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+
+  --tap: 44px;
+  --topbar-h: 60px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151814;
+    --surface: #1e221c;
+    --surface-2: #272c25;
+    --ink: #e5e8e0;
+    --ink-2: #b4bbaf;
+    --ink-3: #848c80;
+    --rule: #30362e;
+    --rule-strong: #4a5247;
+
+    --accent: #9cb287;
+    --accent-strong: #b7c9a6;
+    --on-accent: #151814;
+    --accent-soft: #2a3325;
+    --focus: #a9c290;
+
+    --danger: #ee8579;
+    --danger-soft: #3e1f1b;
+    --warn: #e0a44b;
+    --warn-soft: #3a2c13;
+    --ok: #7cc494;
+    --ok-soft: #1f3226;
+    --info: #86aee6;
+    --info-soft: #1c2a3f;
+
+    --st-present: #7cc494;
+    --st-present-soft: #1f3226;
+    --st-mc: #ee8579;
+    --st-mc-soft: #3e1f1b;
+    --st-ll: #e0a44b;
+    --st-ll-soft: #3a2c13;
+    --st-ma: #86aee6;
+    --st-ma-soft: #1c2a3f;
+    --st-rsi: #c3a3ee;
+    --st-rsi-soft: #2e2240;
+    --st-others: #aab3ae;
+    --st-others-soft: #2b302d;
+
+    --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.5);
+  }
+}

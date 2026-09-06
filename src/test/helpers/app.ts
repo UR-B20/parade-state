@@ -41,7 +41,6 @@ export function fakeAuth(t: TestDb): FakeAuth {
 
 export const TEST_ENV: Bindings = {
   DEMO_CONTROLS: 'false',
-  ASSETS: undefined as unknown as Fetcher,
   SUPABASE_URL: 'https://test.supabase.co',
   SUPABASE_ANON_KEY: 'anon',
   BOOTSTRAP_ADMIN_PASSWORD: 'bootstrap-secret-1',
