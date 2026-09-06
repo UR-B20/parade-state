@@ -4,6 +4,9 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Run the Worker near the database (Supabase, Singapore) rather than near the visitor:
+  // every request makes several database round trips and only one round trip to the visitor.
+  "placement": { "mode": "smart" },
   "assets": {
     "directory": "./dist/client",
     "binding": "ASSETS",

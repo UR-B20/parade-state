@@ -1,22 +1,54 @@
-import { awaitingRank, platoonBreakdown, sumCounts } from '@shared/domain';
-import type { AbsenteeDto, AbsenteesDto, BattalionSummaryDto, UnitSummaryRow } from '@shared/types';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { awaitingRank, contentHash, deriveSubmissionState, effectiveStatuses, platoonBreakdown, sumCounts, unitCounts } from '@shared/domain';
+import type { AbsenteeDto, AbsenteesDto, BattalionSummaryDto, EffectiveStatus, UnitSummaryRow } from '@shared/types';
 import { ABSENCE_STATUSES } from '@shared/statuses';
 import type { Db } from '../db/client';
-import type { EventRow } from '../db/schema';
+import { eventMarks, personnel, statusSpans, submissions, unitEventState, type EventRow } from '../db/schema';
 import { listUnits } from './platoons';
 import type { Bindings } from '../env';
-import { computeUnit, submissionStateFor } from './attendance';
+import { toSpanRow } from './attendance';
 import { toEventDto } from './events';
 import { ensureLateNotifications } from './notifications';
 import { resolveNow } from './settings';
 
-export async function unitRows(db: Db, event: EventRow, now: Date) {
-  const all = await listUnits(db);
+/**
+ * Every unit's rows for one event, loaded battalion-wide in five queries rather than five per
+ * unit: the Worker sits one network round trip away from Postgres for each query, so the
+ * dashboard cost is the query count, not the row count.
+ */
+export async function unitRows(db: Db, event: EventRow, now: Date): Promise<{ row: UnitSummaryRow; statuses: EffectiveStatus[] }[]> {
+  const units = await listUnits(db);
+  const unitIds = units.map((u) => u.id);
+  const [people, spans, marks, subs, activity] = await Promise.all([
+    db.select().from(personnel).where(inArray(personnel.unitId, unitIds)),
+    db.select().from(statusSpans).where(and(inArray(statusSpans.unitId, unitIds), isNull(statusSpans.supersededAt))),
+    db.select({ personId: eventMarks.personId, unitId: eventMarks.unitId }).from(eventMarks).where(eq(eventMarks.eventId, event.id)),
+    db.select({ unitId: submissions.unitId, version: submissions.version, submittedAt: submissions.submittedAt, submittedBy: submissions.submittedBy, contentHash: submissions.contentHash }).from(submissions).where(eq(submissions.eventId, event.id)),
+    db.select().from(unitEventState).where(eq(unitEventState.eventId, event.id)),
+  ]);
+  const latestByUnit = new Map<string, (typeof subs)[number]>();
+  for (const s of subs) {
+    const cur = latestByUnit.get(s.unitId);
+    if (!cur || s.version > cur.version) latestByUnit.set(s.unitId, s);
+  }
+  const activityByUnit = new Map(activity.map((a) => [a.unitId, a]));
   return Promise.all(
-    all.map(async (u) => {
-      const { statuses, counts, hash } = await computeUnit(db, u.id, event);
-      const sub = await submissionStateFor(db, u.id, event, hash, now);
-      const row: UnitSummaryRow = { unit: u, counts, submission: sub.state, platoons: platoonBreakdown(statuses, u.platoons) };
+    units.map(async (u) => {
+      const unitPeople = people.filter((p) => p.unitId === u.id && p.postedInDate <= event.date && (p.postedOutDate === null || p.postedOutDate > event.date));
+      const unitSpans = spans.filter((s) => s.unitId === u.id).map(toSpanRow);
+      const unitMarks = new Set(marks.filter((m) => m.unitId === u.id).map((m) => m.personId));
+      const statuses = effectiveStatuses(unitPeople, unitSpans, unitMarks, event.date);
+      const hash = await contentHash(statuses);
+      const latest = latestByUnit.get(u.id);
+      const act = activityByUnit.get(u.id);
+      const state = deriveSubmissionState({
+        latest: latest ? { version: latest.version, submittedAt: latest.submittedAt.toISOString(), submittedBy: latest.submittedBy, contentHash: latest.contentHash } : null,
+        activity: act ? { lastChangedAt: act.lastChangedAt.toISOString() } : null,
+        cutoffAt: event.cutoffAt.toISOString(),
+        now,
+        currentHash: hash,
+      });
+      const row: UnitSummaryRow = { unit: u, counts: unitCounts(statuses), submission: state, platoons: platoonBreakdown(statuses, u.platoons) };
       return { row, statuses };
     }),
   );

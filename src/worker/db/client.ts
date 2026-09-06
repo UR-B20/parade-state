@@ -18,14 +18,18 @@ export interface DbHandle {
 }
 
 /**
- * One short-lived connection per request. Hyperdrive (when bound) pools and keeps the TLS
+ * Short-lived connections per request. Hyperdrive (when bound) pools and keeps the TLS
  * session warm; otherwise we connect straight to Supabase's transaction-mode pooler, which
  * requires prepared statements to be off.
+ *
+ * `max` must stay above the number of queries a request issues concurrently (Promise.all in
+ * the services): with a single connection postgres.js pipelines the queries, and Supabase's
+ * pooler never answers a pipelined batch, so the request hangs until the Worker times out.
  */
 export function connectDb(env: Bindings): DbHandle {
   const url = env.HYPERDRIVE?.connectionString ?? env.SUPABASE_DB_URL;
   if (!url) throw new ConfigError('set the SUPABASE_DB_URL secret or bind HYPERDRIVE');
-  const sql = postgres(url, { prepare: false, max: 1, fetch_types: false, idle_timeout: 10, connect_timeout: 10 });
+  const sql = postgres(url, { prepare: false, max: 6, fetch_types: false, idle_timeout: 10, connect_timeout: 10 });
   const db = drizzle(sql, { schema, casing: 'snake_case' });
   return { db, close: () => sql.end({ timeout: 2 }) };
 }
