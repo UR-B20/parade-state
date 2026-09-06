@@ -149,6 +149,11 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   trends, exports) could not be received on this network but are successes in Worker logs.
   Throwaway data removed; `needsBootstrap` true. Owner still to do: disable legacy Supabase
   keys, real first sign-in, browser pass of the S1 screens.
+- 6 Sep 20:30Z: the Cloudflare project had silently lost its GitHub connection after the first
+  deploy ("This project is disconnected from your Git account" on the Builds page), so no push
+  after the first build deployed; every "live" observation between 18:30Z and 20:30Z was
+  against the original code. The owner reconnected Git. Check `GET /api/admin/health` without
+  a token: 401 means a build with the health route is live, 404 means the old build.
 - Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.
