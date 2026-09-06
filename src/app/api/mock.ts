@@ -7,11 +7,11 @@ import { addDays, formatSgTime, sgDateOf, sgLocalToIso, type IsoDate, type IsoTi
 import type { AbsenceStatus } from '@shared/statuses';
 import type {
   AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto, PlatoonDto,
-  SettingsDto, SubmissionDto, SubmissionState, UnitAttendanceDto, UnitDto, UnitId, UserDto,
+  SettingsDto, SubmissionDto, SubmissionState, TrendsDto, UnitAttendanceDto, UnitDto, UnitId, UserDto,
 } from '@shared/types';
 import {
   awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, isDateLocked,
-  MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
+  MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, buildTrends, trendDates, type SnapshotEntry, type SpanRow, type TrendSubmission,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
@@ -394,20 +394,70 @@ export class MockApi implements ApiClient {
   // ---- admin ----
 
   summary(eventId: string): Promise<BattalionSummaryDto> {
+    return this.wait(() => this.buildSummary(this.eventById(eventId)));
+  }
+
+  private async buildSummary(event: EventDto): Promise<BattalionSummaryDto> {
+    const rows = [];
+    for (const u of this.data.units) {
+      const unit = this.unit(u.id);
+      const { statuses, counts } = this.computeUnit(unit.id, event);
+      const hash = await contentHash(statuses);
+      const sub = await this.submissionFor(unit.id, event, hash);
+      rows.push({ unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) });
+    }
+    this.ensureLateNotifications(event);
+    rows.sort((a, b) => awaitingRank(a.submission) - awaitingRank(b.submission) || a.unit.sortOrder - b.unit.sortOrder);
+    const submitted = rows.filter((r) => r.submission.kind === 'SUBMITTED' || r.submission.kind === 'RESUBMITTED').length;
+    return { event, totals: sumCounts(rows.map((r) => r.counts)), unitsSubmitted: submitted, unitsTotal: rows.length, units: rows, serverNow: this.nowIso() };
+  }
+
+  private loadPast(event: EventDto, days: number, unitId?: string) {
+    const pastDates = new Set(trendDates(event.date, days).filter((d) => d !== event.date));
+    const pastEvents = this.data.events.filter((e) => e.type === 'AM' && pastDates.has(e.date)).map((e) => ({ id: e.id, date: e.date, cutoffAt: e.cutoffAt }));
+    const pastIds = new Set(pastEvents.map((e) => e.id));
+    const latest = new Map<string, TrendSubmission & { version: number }>();
+    for (const s of this.data.submissions) {
+      if (!pastIds.has(s.eventId) || s.submittedAt > this.nowIso() || (unitId && s.unitId !== unitId)) continue;
+      const key = `${s.unitId}|${s.eventId}`;
+      const cur = latest.get(key);
+      if (!cur || s.version > cur.version) latest.set(key, { unitId: s.unitId, eventId: s.eventId, submittedAt: s.submittedAt, counts: s.counts, version: s.version });
+    }
+    return { pastEvents, submissions: [...latest.values()] };
+  }
+
+  trends(eventId: string, days = 14): Promise<TrendsDto> {
     return this.wait(async () => {
       const event = this.eventById(eventId);
-      const rows = [];
-      for (const u of this.data.units) {
-        const unit = this.unit(u.id);
-        const { statuses, counts } = this.computeUnit(unit.id, event);
-        const hash = await contentHash(statuses);
-        const sub = await this.submissionFor(unit.id, event, hash);
-        rows.push({ unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) });
-      }
-      this.ensureLateNotifications(event);
-      rows.sort((a, b) => awaitingRank(a.submission) - awaitingRank(b.submission) || a.unit.sortOrder - b.unit.sortOrder);
-      const submitted = rows.filter((r) => r.submission.kind === 'SUBMITTED' || r.submission.kind === 'RESUBMITTED').length;
-      return { event, totals: sumCounts(rows.map((r) => r.counts)), unitsSubmitted: submitted, unitsTotal: rows.length, units: rows, serverNow: this.nowIso() };
+      const summary = await this.buildSummary(event);
+      return buildTrends({
+        event,
+        days,
+        units: this.data.units.map((u) => ({ id: u.id, name: u.name, sortOrder: u.sortOrder })),
+        ...this.loadPast(event, days),
+        today: { units: summary.units, totals: summary.totals, unitsSubmitted: summary.unitsSubmitted, unitsTotal: summary.unitsTotal },
+        todayStatuses: this.data.units.flatMap((u) => this.computeUnit(u.id, event).statuses),
+        serverNow: this.nowIso(),
+      });
+    });
+  }
+
+  unitTrends(unitId: string, eventId: string, days = 14): Promise<TrendsDto> {
+    return this.wait(async () => {
+      const event = this.eventById(eventId);
+      const unit = this.unit(unitId);
+      const { statuses, counts } = this.computeUnit(unitId, event);
+      const sub = await this.submissionFor(unitId, event, await contentHash(statuses));
+      const row = { unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) };
+      return buildTrends({
+        event,
+        days,
+        units: [{ id: unit.id, name: unit.name, sortOrder: unit.sortOrder }],
+        ...this.loadPast(event, days, unitId),
+        today: { units: [row], totals: counts, unitsSubmitted: sub.state.kind === 'SUBMITTED' || sub.state.kind === 'RESUBMITTED' ? 1 : 0, unitsTotal: 1 },
+        todayStatuses: statuses,
+        serverNow: this.nowIso(),
+      });
     });
   }
 

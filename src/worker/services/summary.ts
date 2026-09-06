@@ -10,7 +10,7 @@ import { toEventDto } from './events';
 import { ensureLateNotifications } from './notifications';
 import { resolveNow } from './settings';
 
-async function unitRows(db: Db, event: EventRow, now: Date) {
+export async function unitRows(db: Db, event: EventRow, now: Date) {
   const all = await listUnits(db);
   return Promise.all(
     all.map(async (u) => {

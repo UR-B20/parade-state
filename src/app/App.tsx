@@ -82,6 +82,7 @@ const router = createRouter([
       { path: 'roll', element: <RollPage /> },
       { path: 'account/password', element: <ChangePasswordPage /> },
       { path: 'admin', element: <DashboardPage /> },
+      { path: 'admin/units', element: <DashboardPage /> },
       { path: 'admin/absentees', element: <DashboardPage /> },
       { path: 'admin/units/:unitId', element: <AdminUnitPage /> },
       { path: 'admin/users', element: <UsersPage /> },

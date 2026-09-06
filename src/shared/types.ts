@@ -273,3 +273,35 @@ export interface ApiErrorBody {
     details?: unknown;
   };
 }
+
+/** One day in the battalion trend. Past days come from submissions; the event day is live. */
+export interface TrendDay {
+  date: IsoDate;
+  eventId: string | null;
+  live: boolean;
+  /** Counts over the strength covered: the whole battalion today, submitted units on past days. */
+  counts: UnitCounts;
+  unitsSubmitted: number;
+  unitsTotal: number;
+  onTime: number;
+  late: number;
+}
+
+export interface UnitTimeliness {
+  unitId: string;
+  unitName: string;
+  onTime: number;
+  late: number;
+  missed: number;
+  /** Today only: not submitted yet. */
+  pending: number;
+}
+
+export interface TrendsDto {
+  event: EventDto;
+  days: TrendDay[];
+  units: UnitTimeliness[];
+  /** Today's Others absentees by sub-type. */
+  othersSubTypes: Record<OthersSubType, number>;
+  serverNow: IsoTimestamp;
+}

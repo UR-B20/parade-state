@@ -377,5 +377,56 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
   }
   notifications.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
+  // ---- History: the AM parades of the 13 days before the demo day, so trends and reporting
+  // discipline have something to show. Generated last so the demo day's figures stay exactly
+  // as the brief describes them. Absences are real spans that ended before the demo day.
+  const HISTORY_DAYS = 13;
+  // Days (counted back from the demo day) with heavier absence: Tue 1 Sep after a battalion
+  // exercise (report-sick spike), and two milder bumps.
+  const heavyDays: Record<number, number> = { 5: 2.1, 12: 1.4, 3: 1.25 };
+  const missedDays: Partial<Record<UnitId, number[]>> = { S2: [3, 9] };
+  const lateDays: Partial<Record<UnitId, number[]>> = { COY2: [2, 6, 11], S4: [9] };
+  const lastPast = addDays(date, -1);
+  const minute = () => String(rng.int(10, 59));
+  for (let back = HISTORY_DAYS; back >= 1; back--) {
+    const d = addDays(date, -back);
+    const ev: DemoEvent = { id: `${d}-AM`, date: d, type: 'AM', cutoffAt: sgLocalToIso(d, '10:00') };
+    events.push(ev);
+    const factor = heavyDays[back] ?? 1;
+    for (const spec of UNIT_SPECS) {
+      const commander = commanderFor.get(spec.id)!;
+      const unitPeople = personnel.filter((p) => p.unitId === spec.id);
+      const unitSpans = () => spans.filter((s) => s.unitId === spec.id);
+      const covered = new Set(effectiveStatuses(unitPeople, unitSpans(), new Set(), d).filter((s) => s.status !== 'UNMARKED').map((s) => s.personId));
+      const baseline = spec.mc + spec.ll + spec.ma + spec.rsi + spec.others;
+      const target = Math.max(0, Math.round(baseline * factor) + rng.int(-1, 1));
+      const pool = rng.shuffle(unitPeople.filter((p) => !covered.has(p.id) && ['PTE', 'LCP', 'CPL', 'CFC', '3SG'].includes(p.rank)));
+      for (let i = 0; i < target - covered.size && i < pool.length; i++) {
+        const person = pool[i]!;
+        const r = rng.next();
+        const status: AbsenceStatus = factor > 1.5
+          ? (r < 0.45 ? 'RSI' : r < 0.7 ? 'MC' : r < 0.85 ? 'MA' : 'LL')
+          : (r < 0.35 ? 'MC' : r < 0.55 ? 'LL' : r < 0.7 ? 'MA' : r < 0.85 ? 'RSI' : 'OTHERS');
+        const subType = status === 'OTHERS' ? rng.pick(['COURSE', 'OUTFIELD', 'ATTACHED_OUT', 'DUTY'] as const) : null;
+        const wanted = addDays(d, status === 'RSI' || status === 'MA' ? 0 : rng.int(0, 2));
+        const end = wanted < lastPast ? wanted : lastPast;
+        const remark = status === 'OTHERS' ? rng.pick(OTHERS_REMARKS[subType!]) : status === 'RSI' ? null : rng.pick(['Medical centre', 'Polyclinic', 'Excuse RMJ']);
+        spans.push({ id: rng.uuid(), personId: person.id, unitId: spec.id, status, subType, startDate: d, endDate: end, remark, createdAt: sgLocalToIso(d, `0${rng.int(7, 8)}:${minute()}`), createdBy: commander.id });
+      }
+      if (missedDays[spec.id]?.includes(back)) continue; // Nothing marked, nothing submitted that day.
+      const marked = new Set<string>();
+      for (const s of effectiveStatuses(unitPeople, unitSpans(), new Set(), d)) {
+        if (s.status !== 'UNMARKED') continue;
+        marks.push({ eventId: ev.id, personId: s.personId, unitId: spec.id, markedBy: commander.id, markedAt: sgLocalToIso(d, `0${rng.int(7, 8)}:${minute()}`) });
+        marked.add(s.personId);
+      }
+      const statuses = effectiveStatuses(unitPeople, unitSpans(), marked, d);
+      const late = lateDays[spec.id]?.includes(back) ?? false;
+      const submittedAt = sgLocalToIso(d, late ? `1${rng.int(0, 1)}:${minute()}` : `0${rng.int(8, 9)}:${minute()}`);
+      unitEventState.push({ unitId: spec.id, eventId: ev.id, firstChangedAt: sgLocalToIso(d, '07:30'), lastChangedAt: submittedAt, lastChangedBy: commander.id });
+      submissions.push({ id: rng.uuid(), unitId: spec.id, eventId: ev.id, version: 1, submittedBy: commander.id, submittedAt, contentHash: await contentHash(statuses), counts: unitCounts(statuses), snapshot: toSnapshot(statuses) });
+    }
+  }
+
   return { date, now: DEMO_NOW, units: DEMO_UNITS, platoons: DEMO_PLATOONS, users, personnel, events, spans, marks, unitEventState, submissions, notifications };
 }

@@ -1,6 +1,7 @@
 import type {
   AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto,
   PersonDto, PlatoonDto, SettingsDto, SubmissionDto, UnitAttendanceDto, UnitDto, UserDto,
+ TrendsDto,
 } from '@shared/types';
 import type { IsoDate, IsoTimestamp } from '@shared/dates';
 
@@ -41,6 +42,8 @@ export interface ApiClient {
   submissions(unitId: string, eventId: string): Promise<SubmissionDto[]>;
 
   summary(eventId: string): Promise<BattalionSummaryDto>;
+  trends(eventId: string, days?: number): Promise<TrendsDto>;
+  unitTrends(unitId: string, eventId: string, days?: number): Promise<TrendsDto>;
   absentees(eventId: string): Promise<AbsenteesDto>;
   exportUrl(eventId: string, format: 'xlsx' | 'csv'): string;
   download(eventId: string, format: 'xlsx' | 'csv'): Promise<Blob>;

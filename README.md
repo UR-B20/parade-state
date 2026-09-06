@@ -24,6 +24,12 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
 - **Ad hoc events** created by S1 are pre-filled from each unit's last submitted parade state
   on or before that date. AM and PM parades start unmarked.
 - Units become **Late** after the cut-off (AM 10:00, PM 14:00 by default, editable by S1).
+- The S1 **Overview** reads like a briefing: a headline sentence, auto-generated insights, KPI
+  tiles with 7-day deltas, the strength composition, present share by unit (with platoon
+  drill-down), the 14-day present-rate trend against a 90% norm, absence by reason against its
+  run rate, and each unit's reporting discipline. Past days come from what units submitted;
+  today is live. Commanders see the same 14-day trend for their unit as a sparkline. Every
+  chart has a table view.
 - Commanders can mark **today and future dates**. S1 can unlock a past date for 24 hours.
 
 ## Local development
@@ -91,6 +97,9 @@ secrets exported. This loads the fictional battalion (312 personnel, Sun 6 Sep 2
 accounts (`cdr.coy1@parade-state.demo`, `s1admin@parade-state.demo`, password `demo1234`) and
 enables the prototype controls (demo clock, simulated connection loss) in the account menu.
 In the demo, Coy 1 still has ten people to mark, S2 has not started, and six units have submitted.
+Thirteen prior days of AM parades are included so the Overview's trends and reporting
+discipline have history (a report-sick spike on Tue 1 Sep, Coy 2 late three times, S2 missing
+twice).
 Never enable it on the production deployment.
 
 ## Operations notes
@@ -107,7 +116,7 @@ Never enable it on the production deployment.
 ```
 src/shared     types, statuses, ranks, Singapore dates, validation schemas, pure domain logic, demo dataset
 src/worker     Hono API: auth, events, roll, attendance, submissions, notifications, summary, export, cron
-src/app        React client: pages, components, API client (HTTP + in-memory mock), offline persistence
+src/app        React client: pages, components, Chart.js overview, API client (HTTP + in-memory mock), offline persistence
 migrations     Drizzle SQL migrations (0001 is Supabase-only and guarded)
 seed           Demo battalion loader for Supabase
 scripts        migrate, icons, screenshot capture, demo checks

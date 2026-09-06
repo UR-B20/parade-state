@@ -5,6 +5,7 @@ import { absenteesCsv, paradeStateXlsx } from '../export/paradeState';
 import { getEvent } from '../services/events';
 import { getSettings } from '../services/settings';
 import { absentees, battalionSummary } from '../services/summary';
+import { battalionTrends } from '../services/trends';
 
 export const adminRoutes = new Hono<AppEnv>();
 adminRoutes.use('*', requireAuth, requireAdmin);
@@ -13,6 +14,14 @@ adminRoutes.get('/summary/:eventId', async (c) => {
   const db = c.get('db');
   const event = await getEvent(db, c.req.param('eventId'), await getSettings(db));
   return c.json(await battalionSummary(db, c.env, event, c.get('realNow')));
+});
+
+adminRoutes.get('/trends/:eventId', async (c) => {
+  const db = c.get('db');
+  const event = await getEvent(db, c.req.param('eventId'), await getSettings(db));
+  const requested = Number(c.req.query('days') ?? 14);
+  const days = Number.isFinite(requested) ? Math.min(60, Math.max(2, Math.round(requested))) : 14;
+  return c.json(await battalionTrends(db, c.env, event, days, c.get('realNow')));
 });
 
 adminRoutes.get('/absentees/:eventId', async (c) => {

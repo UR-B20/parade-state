@@ -36,7 +36,7 @@
   --color-danger: #b63b4a;
   --color-danger-tint: #f9e9eb;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --radius-s: 8px;
-  --radius-m: 10px;
-  --radius-l: 12px;
+  --radius-ctl: 8px;
+  --radius-card: 12px;
+  --breakpoint-wide: 900px;
 }

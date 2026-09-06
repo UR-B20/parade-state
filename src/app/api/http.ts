@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IsoDate, IsoTimestamp } from '@shared/dates';
 import type {
   AbsenteesDto, ApiErrorBody, BattalionSummaryDto, ConfigDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto, PlatoonDto,
-  SettingsDto, SubmissionDto, UnitAttendanceDto, UnitDto, UserDto,
+  SettingsDto, SubmissionDto, UnitAttendanceDto, UnitDto, UserDto, TrendsDto,
 } from '@shared/types';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type CreatePersonBody, type CreateUserBody, type DemoAccount, type UpdatePersonBody, type UpdateUserBody } from './client';
 
@@ -105,6 +105,8 @@ export class HttpApi implements ApiClient {
   submissions(unitId: string, eventId: string) { return this.call<SubmissionDto[]>(`/units/${unitId}/submissions/${eventId}`); }
 
   summary(eventId: string) { return this.call<BattalionSummaryDto>(`/admin/summary/${eventId}`); }
+  trends(eventId: string, days = 14) { return this.call<TrendsDto>(`/admin/trends/${eventId}?days=${days}`); }
+  unitTrends(unitId: string, eventId: string, days = 14) { return this.call<TrendsDto>(`/units/${unitId}/attendance/${eventId}/trends?days=${days}`); }
   absentees(eventId: string) { return this.call<AbsenteesDto>(`/admin/absentees/${eventId}`); }
   exportUrl(eventId: string, format: 'xlsx' | 'csv') { return `/api/admin/export/${eventId}.${format}`; }
   async download(eventId: string, format: 'xlsx' | 'csv'): Promise<Blob> {

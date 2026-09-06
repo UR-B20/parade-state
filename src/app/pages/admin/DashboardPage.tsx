@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { formatSgDateLong, formatSgTime, sgDateOf, type IsoDate } from '@shared/dates';
 import { awaitingRank, isSubmitted } from '@shared/domain';
 import type { UnitSummaryRow } from '@shared/types';
-import { useAbsentees, useEvents, useNotifications, useSummary } from '../../api/queries';
+import { useAbsentees, useEvents, useNotifications, useSummary, useTrends } from '../../api/queries';
 import { useApi } from '../../api/provider';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as v from 'valibot';
@@ -27,6 +27,7 @@ import { StatusPill } from '../../components/StatusPill';
 import { StrengthSummary } from '../../components/StrengthSummary';
 import { Tabs } from '../../components/Tabs';
 import { UnitRow } from '../../components/UnitRow';
+import { OverviewTab } from './overview/OverviewTab';
 import { ApiError } from '../../api/client';
 import '../pages.css';
 
@@ -47,7 +48,7 @@ export function DashboardPage() {
   const today = sgDateOf(now);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
-  const tab = location.pathname.endsWith('/absentees') ? 'absentees' : 'units';
+  const tab = location.pathname.endsWith('/absentees') ? 'absentees' : location.pathname.endsWith('/units') ? 'units' : 'overview';
 
   const date: IsoDate = params.get('date') ?? today;
   const eventsQ = useEvents(date);
@@ -71,6 +72,7 @@ export function DashboardPage() {
 
   const summaryQ = useSummary(eventId);
   const absenteesQ = useAbsentees(tab === 'absentees' ? eventId : null);
+  const trendsQ = useTrends(tab === 'overview' ? eventId : null);
   const notifQ = useNotifications(true);
   const summary = summaryQ.data;
   const event = summary?.event ?? events?.find((e) => e.id === eventId) ?? null;
@@ -87,6 +89,7 @@ export function DashboardPage() {
     return api.subscribeAdminChanges(() => {
       void qc.invalidateQueries({ queryKey: ['summary'] });
       void qc.invalidateQueries({ queryKey: ['absentees'] });
+      void qc.invalidateQueries({ queryKey: ['trends'] });
       void qc.invalidateQueries({ queryKey: keys.notifications });
     });
   }, [api, qc]);
@@ -127,6 +130,19 @@ export function DashboardPage() {
       <ConnectionBanner />
 
       <main className={`page__content page__content--wide`}>
+        <Tabs
+          label="Dashboard sections"
+          activeId={tab}
+          items={[
+            { id: 'overview', label: 'Overview', to: `/admin${query}` },
+            { id: 'units', label: 'Units', count: summary?.unitsTotal, to: `/admin/units${query}` },
+            { id: 'absentees', label: 'Absentees', count: summary?.totals.absent, to: `/admin/absentees${query}` },
+          ]}
+        />
+
+        {tab === 'overview' ? (
+          <OverviewTab summary={summary} trends={trendsQ.data} error={summaryQ.error ?? trendsQ.error} onRetry={() => { void summaryQ.refetch(); void trendsQ.refetch(); }} />
+        ) : (
         <div className={wide ? 'admin-grid' : 'group'} style={wide ? undefined : { gap: 12 }}>
           <div className={wide ? 'admin-grid__side' : 'group'} style={wide ? undefined : { gap: 12 }}>
             {summary ? (
@@ -150,15 +166,6 @@ export function DashboardPage() {
           </div>
 
           <div className="group" style={{ gap: 12 }}>
-            <Tabs
-              label="Dashboard sections"
-              activeId={tab}
-              items={[
-                { id: 'units', label: 'Units', count: summary?.unitsTotal, to: `/admin${query}` },
-                { id: 'absentees', label: 'Absentees', count: summary?.totals.absent, to: `/admin/absentees${query}` },
-              ]}
-            />
-
             {tab === 'units' && (
               summaryQ.isPending ? (
                 <SkeletonRows rows={8} />
@@ -214,8 +221,9 @@ export function DashboardPage() {
             )}
           </div>
         </div>
+        )}
 
-        {!wide && eventId && <ExportMenu eventId={eventId} fileStem={fileStem} />}
+        {!wide && tab !== 'overview' && eventId && <ExportMenu eventId={eventId} fileStem={fileStem} />}
       </main>
 
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} data={notifQ.data} today={today} />

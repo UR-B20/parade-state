@@ -53,6 +53,27 @@ export function useSummary(eventId: string | null) {
   });
 }
 
+export function useTrends(eventId: string | null, days = 14) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.trends(eventId ?? '', days),
+    queryFn: () => api.trends(eventId!, days),
+    enabled: !!eventId,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useUnitTrends(unitId: string | null, eventId: string | null, days = 14) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.unitTrends(unitId ?? '', eventId ?? '', days),
+    queryFn: () => api.unitTrends(unitId!, eventId!, days),
+    enabled: !!unitId && !!eventId,
+    staleTime: 15_000,
+  });
+}
+
 export function useAbsentees(eventId: string | null) {
   const api = useApi();
   return useQuery({
@@ -87,10 +108,14 @@ export function useSettings(enabled: boolean) {
 export function useInvalidate() {
   const qc = useQueryClient();
   return {
-    attendance: (unitId: string, eventId: string) => qc.invalidateQueries({ queryKey: keys.attendance(unitId, eventId) }),
+    attendance: (unitId: string, eventId: string) => {
+      void qc.invalidateQueries({ queryKey: ['unit-trends', unitId, eventId] });
+      return qc.invalidateQueries({ queryKey: keys.attendance(unitId, eventId) });
+    },
     admin: (eventId: string) => {
       void qc.invalidateQueries({ queryKey: keys.summary(eventId) });
       void qc.invalidateQueries({ queryKey: keys.absentees(eventId) });
+      void qc.invalidateQueries({ queryKey: ['trends', eventId] });
       void qc.invalidateQueries({ queryKey: keys.notifications });
     },
     all: () => qc.invalidateQueries(),

@@ -6,7 +6,7 @@ const d = await buildDemoDataset();
 const rows = d.units.map((u) => {
   const people = d.personnel.filter((p) => p.unitId === u.id);
   const spans = d.spans.filter((s) => s.unitId === u.id);
-  const marks = new Set(d.marks.filter((m) => m.unitId === u.id).map((m) => m.personId));
+  const marks = new Set(d.marks.filter((m) => m.unitId === u.id && m.eventId === `${d.date}-AM`).map((m) => m.personId));
   const c = unitCounts(effectiveStatuses(people, spans, marks, d.date));
   return { unit: u.name, ...c, subs: d.submissions.filter((s) => s.unitId === u.id).length };
 });

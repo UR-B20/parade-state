@@ -5,3 +5,5 @@ export * from './submissionState';
 export * from './diff';
 export * from './dateLock';
 export * from './markOps';
+export * from './trends';
+export * from './insights';

@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useMutationState } from '@tanstack/react-query';
 import { formatSgDateLong, formatSgTime, sgDateOf, type IsoDate } from '@shared/dates';
 import type { EffectiveStatus, MarkBody } from '@shared/types';
-import { useEvents, useUnitAttendance } from '../../api/queries';
+import { useEvents, useUnitAttendance, useUnitTrends } from '../../api/queries';
 import { MARK_MUTATION_KEY, useMarkPerson, useMarkRemainingPresent, useSubmit, type MarkVariables } from '../../api/mutations';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../../state/auth';
@@ -22,6 +22,7 @@ import { SkeletonRows, SkeletonSummary } from '../../components/Skeleton';
 import { StatusPill } from '../../components/StatusPill';
 import { StatusSheet } from '../../components/StatusSheet';
 import { StrengthSummary } from '../../components/StrengthSummary';
+import { UnitTrendCard } from '../../components/UnitTrendCard';
 import { ALL_PLATOONS, NO_PLATOON, PlatoonBreakdown, PlatoonPicker } from '../../components/PlatoonPicker';
 import { unitCounts } from '@shared/domain';
 import { SubmitFooter } from '../../components/SubmitFooter';
@@ -67,6 +68,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   );
 
   const attendanceQ = useUnitAttendance(unitId, eventId);
+  const trendsQ = useUnitTrends(unitId, eventId);
   const data = attendanceQ.data;
   const event = data?.event ?? events?.find((e) => e.id === eventId) ?? null;
 
@@ -240,6 +242,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
           <SkeletonSummary />
         )}
 
+        {data && platoon === ALL_PLATOONS && trendsQ.data && <UnitTrendCard trends={trendsQ.data} />}
         {data && <PlatoonPicker platoons={data.platoons} selected={platoon} onChange={setPlatoon} strength={data.counts.strength} />}
         <SearchField value={search} onChange={setSearch} />
         <FilterChips

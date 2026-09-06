@@ -56,6 +56,15 @@ test.describe('SoldierTrack', () => {
     await page.goto('/login');
     await page.getByRole('button', { name: 'Sign in as S1 admin' }).click();
     await expect(page.getByRole('heading', { name: 'Battalion' })).toBeVisible();
+    // Overview: executive summary, KPI tiles and charts on the 14-day history.
+    await expect(page.getByText(/^6 of 8 units have submitted: 263 of 312 marked present, 24 still to mark/)).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Key figures' })).toContainText('91%');
+    await expect(page.getByRole('list', { name: 'Insights' })).toContainText('Coy 2 (3 late, 0 missed)');
+    await expect(page.getByRole('img', { name: /Strength composition/ })).toBeVisible();
+    await page.getByRole('region', { name: 'Reporting discipline' }).getByRole('button', { name: 'Table' }).click();
+    await expect(page.getByRole('table', { name: 'Reporting discipline' })).toContainText('Coy 2');
+
+    await page.getByRole('tab', { name: /^Units/ }).click();
     await expect(page.locator('.strength__present')).toHaveText('263');
     await expect(page.getByText('6 of 8 units submitted')).toBeVisible();
     await expect(page.getByText(/24 not yet marked/)).toBeVisible();
@@ -81,6 +90,8 @@ test.describe('SoldierTrack', () => {
     await page.getByRole('button', { name: 'Prototype controls' }).click();
     await page.getByRole('button', { name: /10:05/ }).click();
     await page.getByRole('button', { name: 'Close' }).first().click();
+    await expect(page.getByText(/Past the cut-off with 2 units still out/)).toBeVisible();
+    await page.getByRole('tab', { name: /^Units/ }).click();
     await expect(page.getByText('Late').first()).toBeVisible();
     await expect(page.getByText('Cut-off 10:00 passed')).toBeVisible();
   });
