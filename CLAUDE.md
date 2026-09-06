@@ -122,8 +122,10 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   Cleanup of throwaway data goes through PostgREST and the auth admin API with the secret key.
 - A second Claude session ("Go live plan", started 6 Sep 14:55Z from the desktop app on
   `main`) built a parallel, incompatible implementation on `main` (different table names:
-  absence_spans, present_marks, settings). PR #1 therefore shows conflicts. The owner must
-  choose one; this branch is the complete product. Do not merge the two.
+  absence_spans, present_marks, settings). On 6 Sep the owner chose this branch: `main` was
+  reset to it (the parallel work is kept at `archive/parallel-main-2026-09-06`, never merge
+  it) and the other session was archived. `main` now tracks this branch; fast-forward it from
+  the branch when the owner wants a deploy, never the other way round.
 - Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.

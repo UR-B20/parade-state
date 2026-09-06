@@ -31,9 +31,9 @@ disable the legacy keys once the app is verified against the new ones.
 
 ## Step 1 — reconcile `main` (owner decision, then this session)
 
-`main` carries a parallel implementation from another session. Once the owner chooses the
-SoldierTrack branch, reset `main` to it (force-push, owner-confirmed) so PR #1 is clean and
-Cloudflare can build from `main`. Archive the other session.
+Done 6 Sep: the owner chose the SoldierTrack branch; `main` was reset to it (the parallel
+work is parked at `archive/parallel-main-2026-09-06`) and the other session archived.
+Cloudflare builds from `main`.
 
 ## Step 2 — schema and smoke test (via Cloudflare, because this environment has no Postgres access)
 
