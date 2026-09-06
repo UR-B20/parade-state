@@ -88,6 +88,16 @@ if (cleanupOnly) { await cleanup(); process.exit(0); }
 
 const today = sgToday();
 console.log('live API smoke test, SG date', today);
+// Safety: this check creates and later deletes data in Coy 1 and today's events. It must never run against a battalion in use.
+{
+  const profiles = await (await rest('profiles?select=email')).json();
+  const real = profiles.filter((p) => ![ADMIN.email, CDR.email].includes(p.email));
+  const people = await count('personnel');
+  if ((real.length > 0 || people > 0) && !process.argv.includes('--force')) {
+    console.log(`REFUSING to run: the battalion is in use (${real.length} real account(s), ${people || 0} personnel). Nothing was changed.`);
+    process.exit(2);
+  }
+}
 process.on('unhandledRejection', async (e) => { console.error('ABORTED:', e?.message || e); await cleanup().catch((x) => console.error('cleanup failed', x?.message)); process.exit(1); });
 let r = await api('/config'); check('config reachable', r.status === 200 && r.body.demoControls === false, JSON.stringify({ needsBootstrap: r.body.needsBootstrap, demoControls: r.body.demoControls }));
 if (r.body.needsBootstrap) {

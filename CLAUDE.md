@@ -154,6 +154,13 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   after the first build deployed; every "live" observation between 18:30Z and 20:30Z was
   against the original code. The owner reconnected Git. Check `GET /api/admin/health` without
   a token: 401 means a build with the health route is live, 404 means the old build.
-- Next: follow `docs/go-live.md`.
+- 7 Sep 00:00Z: LIVE AND IN USE. After Git was reconnected, the serialised-query build went
+  live; the Hyperdrive built on the 6543 pooler made every query time out, so its binding was
+  removed (recreate on port 5432 before binding again). Direct connection: each query ≈250 ms
+  from IAD, summary ≈6 s from IAD (much less from Singapore). The owner has created the S1
+  account, a commander and personnel and submitted a parade state. `scripts/live-check.mjs`
+  now refuses to run when real accounts or personnel exist; never run it with `--force`
+  against this project.
+- Next: optional Hyperdrive on the session pooler; custom domain; otherwise maintenance.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.
