@@ -15,6 +15,7 @@ import { submissionRoutes } from './routes/submissions';
 import { notificationRoutes } from './routes/notifications';
 import { runScheduled } from './scheduled';
 import { adminRoutes } from './routes/admin';
+import { healthRoutes } from './routes/health';
 import { profileCount } from './services/users';
 
 export type { AppEnv };
@@ -49,6 +50,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
   app.route('/units/:unitId/submissions', submissionRoutes);
   app.route('/notifications', notificationRoutes);
   app.route('/admin/users', adminUserRoutes);
+  app.route('/admin/health', healthRoutes);
   app.route('/admin', adminRoutes);
   app.route('/admin', adminSettingsRoutes);
 
