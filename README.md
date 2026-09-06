@@ -23,4 +23,34 @@ The Worker connects through Hyperdrive when the `HYPERDRIVE` binding exists, oth
 `SUPABASE_DB_URL` (transaction-mode pooler, port 6543), always with prepared statements off.
 `GET /api/health` reports `db: ok | error | unconfigured`.
 
+## API
+
+All routes live under `/api` on the Worker and answer JSON. Signed-in routes take the Supabase
+access token as `Authorization: Bearer <token>`; the Worker verifies it against the project's
+JWKS (or `SUPABASE_JWT_SECRET` for legacy HS256 projects) and loads the caller's profile.
+
+| Route | Who | Purpose |
+| --- | --- | --- |
+| `GET /health` | anyone | Liveness plus database round trip |
+| `GET /config` | anyone | Supabase URL and anon key for the client, demo flag, `needsBootstrap` |
+| `POST /bootstrap` | anyone, once | Creates the first S1 admin. Needs the `BOOTSTRAP_ADMIN_PASSWORD` secret, refused once any account exists |
+| `GET /me` | signed in | Profile, server time, Singapore date, demo clock |
+| `POST /auth/change-password` | signed in | Sets a new password and clears the must-change flag |
+| `GET /units` | signed in | Unit list |
+| `GET /units/:unitId/roll?date=` | own unit or S1 | Personnel active on the date |
+| `GET /admin/users` | S1 | List accounts |
+| `POST /admin/users` | S1 | Create an admin or a commander with a temporary password |
+| `POST /admin/users/:id/deactivate`, `.../activate` | S1 | Lock an account out immediately, or restore it |
+| `POST /admin/users/:id/reset-password` | S1 | Set a temporary password; the user must change it next sign-in |
+
+A user whose password must be changed can only reach `/me` and `/auth/change-password`; everything
+else answers 403 with code `PASSWORD_CHANGE_REQUIRED`. Commanders asking for another unit get 403 `FORBIDDEN`.
+
+### First admin
+
+1. Set the `BOOTSTRAP_ADMIN_PASSWORD` secret on the Worker.
+2. `POST /api/bootstrap` with `{ email, displayName, bootstrapPassword }` (the client shows this form while `needsBootstrap` is true).
+3. Sign in with that email and the bootstrap password, change it when prompted.
+4. Delete the `BOOTSTRAP_ADMIN_PASSWORD` secret from the Worker.
+
 Deployment steps are added in a later milestone.

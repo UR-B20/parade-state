@@ -1,6 +1,6 @@
 # Parade State: go-live plan
 
-Status as of 6 Sep 2026 (M1 closed the same day). This document is the working plan for taking Parade State from the
+Status as of 6 Sep 2026 (M1 and M2 closed the same day). This document is the working plan for taking Parade State from the
 current scaffold to a production deployment used by a battalion every parade day. Update it as
 milestones close.
 
@@ -13,12 +13,12 @@ Verified against the `main` branch (one commit, "Scaffold Parade State"):
 | Toolchain | Works | `pnpm install`, `pnpm typecheck` and `pnpm build` all pass; the Worker and client bundles build cleanly. |
 | Shared domain | Done | Effective status precedence, counts, canonical hash, submission state, diff, date lock and Singapore date helpers in `src/shared`. |
 | Demo dataset | Done | Deterministic battalion of 312 personnel in 8 units; `scripts/check-demo.ts` reconciles counts (287 present, 25 absent) and unique names. |
-| Worker API | Stub | Only `GET /api/health` and `GET /api/config`. Config always reports `needsBootstrap: false`. Scheduled handler is empty. |
+| Worker API | Auth done (M2) | Health, config with real `needsBootstrap`, bootstrap, me, change-password, units, unit roll, S1 account management. Attendance routes are M3. Scheduled handler is empty. |
 | Database | Done (M1) | Drizzle schema, two migrations (generated schema plus hand-written security), `pnpm db:migrate`, `pnpm seed:demo`, Worker client with `prepare: false`, RLS and policies on all 11 tables. |
-| Auth | Missing | No JWT verification, no `/api/me`, no bootstrap flow, no role or unit enforcement. |
+| Auth | Done (M2) | Supabase tokens verified with `jose` (JWKS, HS256 fallback), profile loaded per request, must-change-password gate, admin and unit access checks. |
 | Client UI | Placeholder | `main.tsx` renders the text "Parade State". No router, no query client, no offline persistence wired. |
 | PWA assets | Missing | `index.html` links `manifest.webmanifest`, `favicon.svg` and `apple-touch-icon.png`; there is no `public/` directory, so all three 404. |
-| Tests | Started | Integration suite runs the real migrations and seed on PGlite and checks the brief's counts (19 tests). Domain unit tests and e2e are still M6. |
+| Tests | Started | 55 integration tests: migrations and seed against the brief's counts on PGlite, the auth and account API end to end, token verification for both signing schemes, the Supabase admin calls against a stubbed fetch. Domain unit tests and e2e are still M6. |
 | CI/CD | None | No `.github/workflows`. Deploys would be manual `wrangler deploy`. |
 | Environments | None | No Cloudflare Worker or Supabase project provisioned; no secrets set. |
 
@@ -57,7 +57,7 @@ Exit check: a fresh Supabase project can be migrated and seeded from a clean che
 
 Result: verified on a local Postgres 16 with the Supabase roles and auth schema stubbed (migrate twice, seed through postgres-js, reset and reload) and in `src/test/integration/schema.test.ts` on PGlite. Not yet run against a real Supabase project; that happens when staging is provisioned in M7.
 
-### M2. Auth and bootstrap (about 1 week)
+### M2. Auth and bootstrap (about 1 week) - done
 
 - Verify Supabase access tokens in the Worker with `jose` against the project's JWKS endpoint (fall back to `SUPABASE_JWT_SECRET` HS256 only for legacy projects). Cache the JWKS.
 - Implement `GET /api/me` returning `MeDto` (user, server time, Singapore date, demo info).
@@ -67,6 +67,8 @@ Result: verified on a local Postgres 16 with the Supabase roles and auth schema 
 - Admin endpoints to create, deactivate and reset commander accounts.
 
 Exit check: an S1 admin can be bootstrapped on an empty database, create a commander, and the commander is refused access to any other unit's data.
+
+Result: covered end to end in `src/test/integration/auth.test.ts` against the API on PGlite with an in-memory auth provider, and `token.test.ts` verifies real ES256 and HS256 tokens with `jose`. The Supabase Admin API calls themselves are not exercised until staging exists (M7). The sign-in and change-password screens are built in M3 with the rest of the client.
 
 ### M3. Commander flow (about 2 weeks)
 

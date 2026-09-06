@@ -11,6 +11,7 @@ const STATUS_FOR: Record<ErrorCode, ContentfulStatusCode> = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   DATE_LOCKED: 403,
+  PASSWORD_CHANGE_REQUIRED: 403,
   INTERNAL: 500,
 };
 
@@ -39,6 +40,8 @@ export const forbidden = (message = 'You do not have access to this unit') => ne
 export const unauthorized = (message = 'Sign in to continue') => new AppError('UNAUTHORIZED', message);
 export const validation = (message: string, details?: unknown) => new AppError('VALIDATION', message, details);
 export const conflict = (message: string) => new AppError('CONFLICT', message);
+export const passwordChangeRequired = () =>
+  new AppError('PASSWORD_CHANGE_REQUIRED', 'Change your password to continue');
 
 export function handleError(err: unknown, c: Context): Response {
   if (err instanceof AppError) {

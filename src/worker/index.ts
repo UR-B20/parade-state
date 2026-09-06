@@ -1,13 +1,21 @@
 import { Hono } from 'hono';
-import type { Bindings } from './env';
-import { demoControlsEnabled } from './env';
 import { connect, isDatabaseConfigured } from './db/client';
+import { defaultDeps, withDeps, type AppEnv, type DepsFactory } from './deps';
+import type { Bindings } from './env';
 import { handleError, notFound } from './errors';
-import type { ConfigDto } from '@shared/types';
+import { adminRoutes } from './routes/admin';
+import { bootstrapRoutes } from './routes/bootstrap';
+import { meRoutes } from './routes/me';
+import { unitRoutes } from './routes/units';
 
-export type AppEnv = { Bindings: Bindings };
+export type { AppEnv } from './deps';
 
-export function createApp() {
+export interface AppOptions {
+  /** Builds the per-request database and auth provider. Defaults to Supabase via the Worker bindings. */
+  deps?: DepsFactory;
+}
+
+export function createApp({ deps = defaultDeps }: AppOptions = {}) {
   const app = new Hono<AppEnv>().basePath('/api');
 
   app.onError(handleError);
@@ -34,15 +42,11 @@ export function createApp() {
     return c.json(body, body.ok ? 200 : 503);
   });
 
-  app.get('/config', (c) => {
-    const body: ConfigDto = {
-      supabaseUrl: c.env.SUPABASE_URL ?? '',
-      anonKey: c.env.SUPABASE_ANON_KEY ?? '',
-      demoControls: demoControlsEnabled(c.env),
-      needsBootstrap: false,
-    };
-    return c.json(body);
-  });
+  app.use('*', withDeps(deps));
+  app.route('/', bootstrapRoutes);
+  app.route('/', meRoutes);
+  app.route('/', adminRoutes);
+  app.route('/', unitRoutes);
 
   return app;
 }

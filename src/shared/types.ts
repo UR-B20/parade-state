@@ -43,6 +43,46 @@ export interface ConfigDto {
   needsBootstrap: boolean;
 }
 
+/** Creates the first S1 admin on an empty database. */
+export interface BootstrapBody {
+  email: string;
+  displayName: string;
+  /** Must equal the Worker's BOOTSTRAP_ADMIN_PASSWORD secret; becomes the admin's first password. */
+  bootstrapPassword: string;
+}
+
+export interface ChangePasswordBody {
+  newPassword: string;
+}
+
+export interface CreateUserBody {
+  email: string;
+  displayName: string;
+  role: Role;
+  /** Required for commanders, must be omitted for admins. */
+  unitId?: UnitId | null;
+  /** The user signs in with this once and is then made to change it. */
+  temporaryPassword: string;
+}
+
+export interface ResetPasswordBody {
+  temporaryPassword: string;
+}
+
+export interface UsersDto {
+  users: UserDto[];
+}
+
+export interface UnitsDto {
+  units: UnitDto[];
+}
+
+export interface RollDto {
+  unit: UnitDto;
+  date: IsoDate;
+  persons: PersonDto[];
+}
+
 export interface EventDto {
   id: string;
   date: IsoDate;
@@ -248,6 +288,7 @@ export interface ApiErrorBody {
       | 'NOT_FOUND'
       | 'CONFLICT'
       | 'DATE_LOCKED'
+      | 'PASSWORD_CHANGE_REQUIRED'
       | 'INTERNAL';
     message: string;
     details?: unknown;
