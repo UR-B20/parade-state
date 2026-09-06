@@ -204,6 +204,16 @@ export type MarkBody =
       remark?: string | null;
     };
 
+export interface EventsDto {
+  date: IsoDate;
+  events: EventDto[];
+}
+
+export interface SubmitBody {
+  /** The hash the commander reviewed; the server refuses to submit if the roll changed since. */
+  contentHash?: string;
+}
+
 export interface SubmissionDto {
   id: string;
   unitId: UnitId;
@@ -214,6 +224,15 @@ export interface SubmissionDto {
   submittedByName: string;
   counts: UnitCounts;
   contentHash: string;
+}
+
+export interface SubmissionsDto {
+  submissions: SubmissionDto[];
+}
+
+export interface SubmitResultDto {
+  submission: SubmissionDto;
+  attendance: UnitAttendanceDto;
 }
 
 export interface UnitSummaryRow {

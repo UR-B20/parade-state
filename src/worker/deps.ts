@@ -1,12 +1,11 @@
 /**
- * Per-request dependencies. The default factory opens a database connection and builds the
- * Supabase auth provider from the Worker's bindings; tests supply PGlite and a fake provider.
+ * Per-request dependencies. The Worker entry (index.ts) builds them from the bindings:
+ * a postgres-js connection and the Supabase auth provider. Tests and the in-browser demo
+ * supply PGlite and an in-memory provider, so this module must stay free of Node-only imports.
  */
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { createMiddleware } from 'hono/factory';
 import type { AuthProvider } from './auth/provider';
-import { supabaseAuthProvider } from './auth/supabase';
-import { connect } from './db/client';
 import * as schema from './db/schema';
 import type { Bindings } from './env';
 
@@ -21,15 +20,6 @@ export interface RequestDeps {
 }
 
 export type DepsFactory = (env: Bindings) => RequestDeps;
-
-export const defaultDeps: DepsFactory = (env) => {
-  const { sql, db } = connect(env);
-  return {
-    db: db as unknown as Db,
-    auth: supabaseAuthProvider(env),
-    release: () => sql.end({ timeout: 5 }),
-  };
-};
 
 export type AppEnv = {
   Bindings: Bindings;

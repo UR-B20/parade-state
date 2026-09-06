@@ -6,7 +6,7 @@ import type { AuthProvider } from '../../worker/auth/provider';
 import type { Db } from '../../worker/deps';
 import type { Bindings } from '../../worker/env';
 import { conflict } from '../../worker/errors';
-import { createApp } from '../../worker/index';
+import { createApp } from '../../worker/app';
 import type { TestDb } from './pglite';
 
 export interface FakeAuth extends AuthProvider {

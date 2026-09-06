@@ -1,57 +1,33 @@
-import { Hono } from 'hono';
-import { connect, isDatabaseConfigured } from './db/client';
-import { defaultDeps, withDeps, type AppEnv, type DepsFactory } from './deps';
-import type { Bindings } from './env';
-import { handleError, notFound } from './errors';
-import { adminRoutes } from './routes/admin';
-import { bootstrapRoutes } from './routes/bootstrap';
-import { meRoutes } from './routes/me';
-import { unitRoutes } from './routes/units';
+/** Cloudflare Worker entry: the API on postgres-js and Supabase, plus the scheduled handler. */
+import { createApp } from './app';
+import { supabaseAuthProvider } from './auth/supabase';
+import { connect } from './db/client';
+import type { Db, DepsFactory } from './deps';
+import { isDatabaseConfigured, type Bindings } from './env';
+import { AppError } from './errors';
 
-export type { AppEnv } from './deps';
+export { createApp } from './app';
 
-export interface AppOptions {
-  /** Builds the per-request database and auth provider. Defaults to Supabase via the Worker bindings. */
-  deps?: DepsFactory;
-}
+/** A database handle that fails loudly on first use when no database is configured. */
+const unconfiguredDb = new Proxy({} as Db, {
+  get() {
+    throw new AppError('INTERNAL', 'Database is not configured: bind HYPERDRIVE or set SUPABASE_DB_URL');
+  },
+});
 
-export function createApp({ deps = defaultDeps }: AppOptions = {}) {
-  const app = new Hono<AppEnv>().basePath('/api');
+export const workerDeps: DepsFactory = (env) => {
+  if (!isDatabaseConfigured(env)) {
+    return { db: unconfiguredDb, auth: supabaseAuthProvider(env), release: async () => {} };
+  }
+  const { sql, db } = connect(env);
+  return {
+    db: db as unknown as Db,
+    auth: supabaseAuthProvider(env),
+    release: () => sql.end({ timeout: 5 }),
+  };
+};
 
-  app.onError(handleError);
-  app.notFound((c) => {
-    throw notFound(`Route ${c.req.method} ${c.req.path}`);
-  });
-
-  /** Liveness plus a database round trip when one is configured. 503 when the database fails. */
-  app.get('/health', async (c) => {
-    const body = { ok: true, now: new Date().toISOString(), db: 'unconfigured' as 'unconfigured' | 'ok' | 'error' };
-    if (isDatabaseConfigured(c.env)) {
-      const { sql } = connect(c.env);
-      try {
-        await sql`select 1`;
-        body.db = 'ok';
-      } catch (err) {
-        console.error('Database health check failed', err);
-        body.ok = false;
-        body.db = 'error';
-      } finally {
-        c.executionCtx.waitUntil(sql.end({ timeout: 5 }));
-      }
-    }
-    return c.json(body, body.ok ? 200 : 503);
-  });
-
-  app.use('*', withDeps(deps));
-  app.route('/', bootstrapRoutes);
-  app.route('/', meRoutes);
-  app.route('/', adminRoutes);
-  app.route('/', unitRoutes);
-
-  return app;
-}
-
-const app = createApp();
+const app = createApp({ deps: workerDeps });
 
 export default {
   fetch: app.fetch,

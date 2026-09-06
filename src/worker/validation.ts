@@ -1,6 +1,8 @@
 import { vValidator } from '@hono/valibot-validator';
 import * as v from 'valibot';
 import { validation } from './errors';
+import { isIsoDate } from '@shared/dates';
+import { ABSENCE_STATUSES, OTHERS_SUB_TYPES } from '@shared/statuses';
 
 export const emailSchema = v.pipe(v.string(), v.trim(), v.toLowerCase(), v.email('Enter a valid email address'), v.maxLength(200));
 export const displayNameSchema = v.pipe(v.string(), v.trim(), v.minLength(1, 'Enter a name'), v.maxLength(80));
@@ -10,7 +12,7 @@ export const passwordSchema = v.pipe(
   v.maxLength(128, 'Use at most 128 characters'),
 );
 export const unitIdSchema = v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(16));
-export const isoDateSchema = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'));
+export const isoDateSchema = v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'), v.check(isIsoDate, 'Not a real date'));
 
 export const bootstrapBodySchema = v.object({
   email: emailSchema,
@@ -32,6 +34,25 @@ export const createUserBodySchema = v.object({
 
 export const resetPasswordBodySchema = v.object({
   temporaryPassword: passwordSchema,
+});
+
+const remarkSchema = v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200, 'Keep remarks under 200 characters'))));
+
+export const markBodySchema = v.variant('action', [
+  v.object({ action: v.literal('PRESENT') }),
+  v.object({ action: v.literal('BACK_TO_PRESENT') }),
+  v.object({
+    action: v.literal('SET'),
+    status: v.picklist(ABSENCE_STATUSES, 'Choose a status'),
+    subType: v.optional(v.nullable(v.picklist(OTHERS_SUB_TYPES, 'Choose a kind'))),
+    startDate: isoDateSchema,
+    endDate: v.nullable(isoDateSchema),
+    remark: remarkSchema,
+  }),
+]);
+
+export const submitBodySchema = v.object({
+  contentHash: v.optional(v.pipe(v.string(), v.maxLength(64))),
 });
 
 /** Validate a JSON body; failures become a 400 VALIDATION error with one entry per field. */

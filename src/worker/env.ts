@@ -17,3 +17,12 @@ export interface Bindings extends Omit<Env, 'DEMO_CONTROLS'> {
 export function demoControlsEnabled(env: Pick<Bindings, 'DEMO_CONTROLS'>): boolean {
   return String(env.DEMO_CONTROLS) === 'true';
 }
+
+/** Hyperdrive when bound, otherwise the transaction-mode pooler URL. */
+export function databaseConnectionString(env: Pick<Bindings, 'HYPERDRIVE' | 'SUPABASE_DB_URL'>): string | undefined {
+  return env.HYPERDRIVE?.connectionString ?? env.SUPABASE_DB_URL;
+}
+
+export function isDatabaseConfigured(env: Pick<Bindings, 'HYPERDRIVE' | 'SUPABASE_DB_URL'>): boolean {
+  return Boolean(databaseConnectionString(env));
+}
