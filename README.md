@@ -59,12 +59,22 @@ pnpm seed:demo         # optional: load the fictional battalion (password demo12
 
 1. Create a project at https://supabase.com (region **Southeast Asia (Singapore)**).
 2. From **Project Settings → API** copy the **Project URL**, the **anon** key and the
-   **service_role** key.
+   **service_role** key. The service_role key and the database password are secrets: move
+   them only through environment variables or the Cloudflare secrets UI. If either is ever
+   pasted into a chat, ticket or email, rotate it (service_role: **Reset** on the same page;
+   database password: **Project Settings → Database**).
 3. From **Connect** copy both pooler connection strings:
    - **Transaction** mode (port 6543) → `SUPABASE_DB_URL` (runtime)
    - **Session** mode (port 5432) → `SUPABASE_DB_URL_MIGRATIONS` (migrations and seeding)
-4. Only if the project still uses a shared JWT secret (older projects): copy it as
+4. **Authentication → Providers → Email**: turn **Confirm email** off. S1 creates commanders
+   with a temporary password that they change on first sign-in; a confirmation email would
+   only block them.
+5. Only if the project still uses a shared JWT secret (older projects): copy it as
    `SUPABASE_JWT_SECRET`. New projects publish signing keys and need nothing extra.
+
+The repository carries a project-scoped `.mcp.json` pointing Claude Code at the Supabase MCP
+server for this project. It holds no secrets and signs in through the browser, so it works
+on a developer's machine, not in a remote session.
 
 ### 2. Cloudflare Worker (Workers Builds)
 
@@ -89,6 +99,18 @@ Open the Worker URL. With no accounts yet, the app shows **Set up SoldierTrack**
 name, email, a password and the setup key (`BOOTSTRAP_ADMIN_PASSWORD`). That creates the S1
 admin. From the account menu, **Manage accounts** creates unit commanders with a temporary
 password they must change on first sign-in.
+
+### Go-live checklist (real roll)
+
+- [ ] Any key or password that was ever shared outside the secrets store has been rotated.
+- [ ] Supabase email confirmation is off.
+- [ ] Migrations applied (`pnpm db:migrate`, or the Workers Builds build command).
+- [ ] Worker variables set: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+      `SUPABASE_DB_URL`, `BOOTSTRAP_ADMIN_PASSWORD`; `DEMO_CONTROLS` is `"false"`.
+- [ ] `pnpm seed:demo` was **not** run against this project.
+- [ ] S1 completed **Set up SoldierTrack** on the Worker URL and created the commanders.
+- [ ] Each commander signed in, changed their password and built their roll (platoons for
+      the companies under **Manage roll**).
 
 ### Demo deployment
 
