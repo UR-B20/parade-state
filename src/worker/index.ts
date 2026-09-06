@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Bindings } from './env';
 import { demoControlsEnabled } from './env';
+import { connect, isDatabaseConfigured } from './db/client';
 import { handleError, notFound } from './errors';
 import type { ConfigDto } from '@shared/types';
 
@@ -14,7 +15,24 @@ export function createApp() {
     throw notFound(`Route ${c.req.method} ${c.req.path}`);
   });
 
-  app.get('/health', (c) => c.json({ ok: true, now: new Date().toISOString() }));
+  /** Liveness plus a database round trip when one is configured. 503 when the database fails. */
+  app.get('/health', async (c) => {
+    const body = { ok: true, now: new Date().toISOString(), db: 'unconfigured' as 'unconfigured' | 'ok' | 'error' };
+    if (isDatabaseConfigured(c.env)) {
+      const { sql } = connect(c.env);
+      try {
+        await sql`select 1`;
+        body.db = 'ok';
+      } catch (err) {
+        console.error('Database health check failed', err);
+        body.ok = false;
+        body.db = 'error';
+      } finally {
+        c.executionCtx.waitUntil(sql.end({ timeout: 5 }));
+      }
+    }
+    return c.json(body, body.ok ? 200 : 503);
+  });
 
   app.get('/config', (c) => {
     const body: ConfigDto = {

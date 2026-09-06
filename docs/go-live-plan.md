@@ -1,6 +1,6 @@
 # Parade State: go-live plan
 
-Status as of 6 Sep 2026. This document is the working plan for taking Parade State from the
+Status as of 6 Sep 2026 (M1 closed the same day). This document is the working plan for taking Parade State from the
 current scaffold to a production deployment used by a battalion every parade day. Update it as
 milestones close.
 
@@ -14,11 +14,11 @@ Verified against the `main` branch (one commit, "Scaffold Parade State"):
 | Shared domain | Done | Effective status precedence, counts, canonical hash, submission state, diff, date lock and Singapore date helpers in `src/shared`. |
 | Demo dataset | Done | Deterministic battalion of 312 personnel in 8 units; `scripts/check-demo.ts` reconciles counts (287 present, 25 absent) and unique names. |
 | Worker API | Stub | Only `GET /api/health` and `GET /api/config`. Config always reports `needsBootstrap: false`. Scheduled handler is empty. |
-| Database | Missing | `drizzle.config.ts` points at `src/worker/db/schema.ts`, which does not exist. No `migrations/`, no `seed/`, no migrate script. |
+| Database | Done (M1) | Drizzle schema, two migrations (generated schema plus hand-written security), `pnpm db:migrate`, `pnpm seed:demo`, Worker client with `prepare: false`, RLS and policies on all 11 tables. |
 | Auth | Missing | No JWT verification, no `/api/me`, no bootstrap flow, no role or unit enforcement. |
 | Client UI | Placeholder | `main.tsx` renders the text "Parade State". No router, no query client, no offline persistence wired. |
 | PWA assets | Missing | `index.html` links `manifest.webmanifest`, `favicon.svg` and `apple-touch-icon.png`; there is no `public/` directory, so all three 404. |
-| Tests | None | `pnpm test` exits 1 with "No test files found". No e2e specs. |
+| Tests | Started | Integration suite runs the real migrations and seed on PGlite and checks the brief's counts (19 tests). Domain unit tests and e2e are still M6. |
 | CI/CD | None | No `.github/workflows`. Deploys would be manual `wrangler deploy`. |
 | Environments | None | No Cloudflare Worker or Supabase project provisioned; no secrets set. |
 
@@ -45,7 +45,7 @@ Milestones are ordered by dependency. Effort assumes one developer working full 
 rough size, not a commitment. Each milestone has an exit check that must pass before the next
 one starts.
 
-### M1. Data layer (about 1 week)
+### M1. Data layer (about 1 week) - done
 
 - Write `src/worker/db/schema.ts` with Drizzle tables: `units`, `profiles` (mirrors `auth.users`, holds role, unit, must-change-password, active flag), `personnel`, `absence_spans` (append-only; superseded spans keep history), `present_marks`, `events`, `unit_event_state`, `submissions` (with counts and snapshot JSON), `notifications`, `settings`, `date_unlocks`.
 - Generate the first migration with `pnpm db:generate`; write `scripts/migrate.ts` so `pnpm db:migrate` applies migrations over the session-mode pooler (port 5432).
@@ -54,6 +54,8 @@ one starts.
 - Enable row level security on every table. The Worker uses the service role, so policies only need to cover what the client reads directly over Realtime (see M5).
 
 Exit check: a fresh Supabase project can be migrated and seeded from a clean checkout in one command each, and `scripts/check-demo.ts` counts match a query against the seeded database.
+
+Result: verified on a local Postgres 16 with the Supabase roles and auth schema stubbed (migrate twice, seed through postgres-js, reset and reload) and in `src/test/integration/schema.test.ts` on PGlite. Not yet run against a real Supabase project; that happens when staging is provisioned in M7.
 
 ### M2. Auth and bootstrap (about 1 week)
 
