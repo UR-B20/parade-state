@@ -5,7 +5,7 @@ import { useMutationState } from '@tanstack/react-query';
 import { formatSgDateLong, formatSgTime, sgDateOf, type IsoDate } from '@shared/dates';
 import type { EffectiveStatus, MarkBody } from '@shared/types';
 import { useEvents, useUnitAttendance } from '../../api/queries';
-import { MARK_MUTATION_KEY, useMarkPerson, useSubmit, type MarkVariables } from '../../api/mutations';
+import { MARK_MUTATION_KEY, useMarkPerson, useMarkRemainingPresent, useSubmit, type MarkVariables } from '../../api/mutations';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../../state/auth';
 import { useConnection } from '../../state/connection';
@@ -71,6 +71,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<RollFilter>('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sheetNotPresent, setSheetNotPresent] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const readOnly = me.user.role === 'ADMIN' || !!data?.locked;
 
@@ -88,7 +89,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
       switch (filter) {
         case 'ALL': return true;
         case 'ABSENT': return p.status !== 'PRESENT';
-        case 'UNMARKED': return p.status === 'PRESENT' && !p.confirmed;
+        case 'UNMARKED': return p.status === 'UNMARKED';
         default: return p.status === filter;
       }
     });
@@ -99,8 +100,32 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   );
 
   const mark = useMarkPerson();
+  const bulk = useMarkRemainingPresent(unitId ?? '', eventId ?? '');
   const submit = useSubmit(unitId ?? '', eventId ?? '');
   const connection = useConnection();
+
+  const markPerson = (personId: string, body: MarkBody) => {
+    if (!unitId || !eventId) return;
+    mark.mutate(
+      { unitId, eventId, personId, body },
+      {
+        onError: (err) => {
+          const message = err instanceof ApiError ? err.message : "Couldn't save the change.";
+          toast.show(message, { tone: 'error', action: { label: 'Retry', onClick: () => mark.mutate({ unitId, eventId, personId, body }) } });
+        },
+      },
+    );
+  };
+
+  const onMarkRemainingPresent = async () => {
+    try {
+      const dto = await bulk.mutateAsync();
+      toast.show(`Everyone marked · ${dto.counts.present} present`);
+    } catch (err) {
+      toast.show(err instanceof ApiError ? err.message : "Couldn't mark the remaining personnel.", { tone: 'error' });
+      throw err;
+    }
+  };
 
   const onSave = (body: MarkBody) => {
     if (!unitId || !eventId || !selected) return;
@@ -188,7 +213,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
             counts={data.counts}
             report={reportPill}
             cutoff={cutoff}
-            note={data.counts.presentDefault > 0 ? `${data.counts.presentDefault} not yet marked, counted as Present by default.` : undefined}
+            note={data.counts.unmarked > 0 ? `${data.counts.unmarked} not yet marked. Tap Present or Not present on each row.` : 'Everyone is marked.'}
           />
         ) : (
           <SkeletonSummary />
@@ -200,7 +225,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
           onChange={setFilter}
           total={data?.counts.strength ?? 0}
           absent={data?.counts.absent ?? 0}
-          unmarked={data?.counts.presentDefault ?? 0}
+          unmarked={data?.counts.unmarked ?? 0}
         />
 
         {attendanceQ.isPending ? (
@@ -223,7 +248,15 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
         ) : (
           <ul className="roll" aria-label={`Personnel, ${filtered.length} shown`}>
             {filtered.map((p) => (
-              <PersonRow key={p.personId} person={p} eventDate={date} pending={pendingIds.has(p.personId)} disabled={readOnly} onOpen={(person: EffectiveStatus) => setSelectedId(person.personId)} />
+              <PersonRow
+                key={p.personId}
+                person={p}
+                eventDate={date}
+                pending={pendingIds.has(p.personId)}
+                disabled={readOnly}
+                onOpen={(person: EffectiveStatus, notPresent?: boolean) => { setSheetNotPresent(!!notPresent); setSelectedId(person.personId); }}
+                onPresent={(person: EffectiveStatus) => markPerson(person.personId, { action: 'PRESENT' })}
+              />
             ))}
           </ul>
         )}
@@ -238,12 +271,14 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
           save={{ status: connection.status, pendingCount: connection.pendingCount }}
           locked={data.locked}
           busy={submit.isPending}
+          bulkBusy={bulk.isPending}
           onSubmit={onSubmit}
+          onMarkRemainingPresent={onMarkRemainingPresent}
         />
       )}
 
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
-      <StatusSheet person={readOnly ? null : selected} eventDate={date} eventLabel={event?.label ?? 'this event'} onSave={onSave} onClose={() => setSelectedId(null)} />
+      <StatusSheet person={readOnly ? null : selected} startNotPresent={sheetNotPresent} eventDate={date} eventLabel={event?.label ?? 'this event'} onSave={onSave} onClose={() => setSelectedId(null)} />
     </div>
   );
 }

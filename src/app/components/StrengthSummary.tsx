@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { STATUS_LABEL, STATUSES, type Status } from '@shared/statuses';
+import { STATUS_LABEL, STATUSES, UNMARKED_LABEL, type EffectiveKind } from '@shared/statuses';
 import type { UnitCounts } from '@shared/types';
 import './StrengthSummary.css';
 
@@ -13,9 +13,13 @@ interface StrengthSummaryProps {
   note?: ReactNode;
 }
 
-function countFor(counts: UnitCounts, status: Status): number {
+const KINDS: EffectiveKind[] = [...STATUSES, 'UNMARKED'];
+const labelFor = (k: EffectiveKind) => (k === 'UNMARKED' ? UNMARKED_LABEL : STATUS_LABEL[k]);
+
+function countFor(counts: UnitCounts, status: EffectiveKind): number {
   switch (status) {
     case 'PRESENT': return counts.present;
+    case 'UNMARKED': return counts.unmarked;
     case 'MC': return counts.mc;
     case 'LL': return counts.ll;
     case 'MA': return counts.ma;
@@ -25,8 +29,8 @@ function countFor(counts: UnitCounts, status: Status): number {
 }
 
 export function StatusBand({ counts, label }: { counts: UnitCounts; label: string }) {
-  const parts = STATUSES.map((s) => ({ status: s, n: countFor(counts, s) })).filter((p) => p.n > 0);
-  const text = parts.map((p) => `${STATUS_LABEL[p.status]} ${p.n}`).join(', ');
+  const parts = KINDS.map((s) => ({ status: s, n: countFor(counts, s) })).filter((p) => p.n > 0);
+  const text = parts.map((p) => `${labelFor(p.status)} ${p.n}`).join(', ');
   return (
     <div className="band" role="img" aria-label={`${label}: ${text}`}>
       {parts.map((p) => (
@@ -39,13 +43,13 @@ export function StatusBand({ counts, label }: { counts: UnitCounts; label: strin
 export function StatusLegend({ counts, showZero = false }: { counts: UnitCounts; showZero?: boolean }) {
   return (
     <ul className="legend" aria-label="Attendance by status">
-      {STATUSES.map((s) => {
+      {KINDS.map((s) => {
         const n = countFor(counts, s);
         if (n === 0 && !showZero) return null;
         return (
           <li key={s} className={`legend__item band__seg--${s}`}>
             <span className="legend__swatch" aria-hidden="true" />
-            <span>{STATUS_LABEL[s]}</span>
+            <span>{labelFor(s)}</span>
             <span className="legend__count num">{n}</span>
           </li>
         );

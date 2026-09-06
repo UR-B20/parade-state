@@ -23,16 +23,18 @@ await page.goto(`${base}/login`);
 await page.getByRole('button', { name: 'Sign in as Coy 1 commander' }).waitFor({ timeout: 20_000 });
 await shot(page, '00-login');
 await page.getByRole('button', { name: 'Sign in as Coy 1 commander' }).click();
-await page.getByRole('button', { name: /Daniel Tan/ }).waitFor({ timeout: 20_000 });
+await page.getByRole('button', { name: /Daniel Tan/ }).first().waitFor({ timeout: 20_000 });
 await shot(page, '01-mark-default');
 
-// Filter to absentees
+// Filter to those not yet marked, then absentees
+await page.getByRole('button', { name: /^Not yet marked/ }).click();
+await shot(page, '02a-mark-unmarked-filter');
 await page.getByRole('button', { name: /^Absent/ }).click();
 await shot(page, '02-mark-absent-filter');
 await page.getByRole('button', { name: /^All/ }).click();
 
 // Open the sheet for Daniel Tan (MC)
-await page.getByRole('button', { name: /Daniel Tan/ }).click();
+await page.getByRole('button', { name: /Daniel Tan/ }).first().click();
 await page.locator('dialog[open]').waitFor();
 await shot(page, '03-sheet-mc');
 
@@ -41,13 +43,25 @@ await page.getByRole('button', { name: /^Others/ }).click();
 await shot(page, '04-sheet-others');
 await page.getByRole('button', { name: 'Cancel and close' }).click();
 
-// Mark someone RSI and submit
-await page.getByRole('button', { name: /Amir Rahman/ }).click();
+// Mark someone RSI via the row's Not present button, then mark the rest Present and submit
+await page.getByRole('button', { name: /^Not yet marked/ }).click();
+const firstUnmarked = page.locator('.person--unmarked').first();
+await firstUnmarked.getByRole('button', { name: 'Not present' }).click();
+await page.locator('dialog[open]').waitFor();
+await shot(page, '05a-sheet-not-present');
 await page.getByRole('button', { name: /^RSI/ }).click();
 await shot(page, '05-sheet-rsi');
 await page.getByRole('button', { name: 'Save', exact: true }).click();
 await page.waitForTimeout(600);
+await page.getByRole('button', { name: /^All/ }).click();
 await shot(page, '06-mark-after-change');
+await page.getByRole('button', { name: /Mark remaining/ }).click();
+await page.locator('dialog[open]').waitFor();
+await shot(page, '06a-confirm-bulk');
+await page.locator('dialog[open]').getByRole('button', { name: /^Mark \d+ Present/ }).click();
+await page.getByRole('button', { name: 'Submit to S1' }).waitFor();
+await page.waitForTimeout(400);
+await shot(page, '06b-mark-all-marked');
 await page.getByRole('button', { name: 'Submit to S1' }).click();
 await page.locator('dialog[open]').waitFor();
 await shot(page, '07-confirm-submit');
@@ -56,7 +70,8 @@ await page.locator('.footer__submitted').waitFor();
 await shot(page, '08-mark-submitted');
 
 // Change after submission -> resubmit state
-await page.getByRole('button', { name: /Ryan Lim/ }).click();
+await page.getByRole('button', { name: /Ryan Lim/ }).first().click();
+await page.locator('dialog[open]').getByRole('button', { name: 'Not present' }).click();
 await page.getByRole('button', { name: /^MA/ }).click();
 await page.getByRole('button', { name: 'Save', exact: true }).click();
 await page.getByRole('button', { name: 'Resubmit to S1' }).waitFor();
@@ -84,7 +99,7 @@ const wide = await ctx.newPage();
 await wide.setViewportSize({ width: 1280, height: 900 });
 await wide.goto(`${base}/login`);
 await wide.getByRole('button', { name: 'Sign in as Coy 1 commander' }).click();
-await wide.getByRole('button', { name: /Daniel Tan/ }).waitFor({ timeout: 20_000 });
+await wide.getByRole('button', { name: /Daniel Tan/ }).first().waitFor({ timeout: 20_000 });
 await wide.waitForTimeout(300);
 await wide.screenshot({ path: `${out}/11-mark-wide.png` });
 console.log('saved 11-mark-wide');

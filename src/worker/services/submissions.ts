@@ -4,7 +4,7 @@ import type { SubmissionDto, UnitId } from '@shared/types';
 import type { Db } from '../db/client';
 import { profiles, submissions, type EventRow, type ProfileRow, type SubmissionRow } from '../db/schema';
 import type { Bindings } from '../env';
-import { conflict } from '../errors';
+import { conflict, validation } from '../errors';
 import { computeUnit, getUnit, latestSubmission } from './attendance';
 import { toEventDto } from './events';
 import { notifyAdmins } from './notifications';
@@ -23,6 +23,9 @@ function toDto(s: SubmissionRow, submittedByName: string): SubmissionDto {
 export async function submit(db: Db, _env: Bindings, unitId: string, event: EventRow, user: ProfileRow, realNow: Date): Promise<SubmissionDto> {
   const unit = await getUnit(db, unitId);
   const { statuses, counts, hash } = await computeUnit(db, unitId, event);
+  if (counts.unmarked > 0) {
+    throw validation(`${counts.unmarked} ${counts.unmarked === 1 ? 'person is' : 'people are'} not yet marked. Mark everyone before submitting.`, { unmarked: counts.unmarked });
+  }
   const latest = await latestSubmission(db, unitId, event.id);
   if (latest && latest.contentHash === hash) throw conflict('Nothing has changed since the last submission.');
   const version = (latest?.version ?? 0) + 1;

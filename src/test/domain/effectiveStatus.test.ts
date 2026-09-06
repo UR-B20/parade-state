@@ -18,16 +18,16 @@ describe('effectiveStatuses', () => {
     expect(out.map((p) => p.personId)).toEqual(['b', 'a']);
   });
 
-  it('defaults unmarked personnel to unconfirmed Present', () => {
+  it('leaves people with no mark and no absence UNMARKED', () => {
     const out = effectiveStatuses(people, [], new Set(), '2026-09-06');
-    expect(out.find((p) => p.personId === 'a')).toMatchObject({ status: 'PRESENT', confirmed: false, spanId: null });
+    expect(out.find((p) => p.personId === 'a')).toMatchObject({ status: 'UNMARKED', spanId: null });
   });
 
   it('applies a covering span, including its end date, and not after it', () => {
     const spans = [span({})];
-    expect(effectiveStatuses(people, spans, new Set(), '2026-09-08').find((p) => p.personId === 'a')).toMatchObject({ status: 'MC', confirmed: true, spanId: 's1', endDate: '2026-09-08' });
-    expect(effectiveStatuses(people, spans, new Set(), '2026-09-09').find((p) => p.personId === 'a')).toMatchObject({ status: 'PRESENT', confirmed: false });
-    expect(effectiveStatuses(people, spans, new Set(), '2026-09-04').find((p) => p.personId === 'a')).toMatchObject({ status: 'PRESENT' });
+    expect(effectiveStatuses(people, spans, new Set(), '2026-09-08').find((p) => p.personId === 'a')).toMatchObject({ status: 'MC', spanId: 's1', endDate: '2026-09-08' });
+    expect(effectiveStatuses(people, spans, new Set(), '2026-09-09').find((p) => p.personId === 'a')).toMatchObject({ status: 'UNMARKED' });
+    expect(effectiveStatuses(people, spans, new Set(), '2026-09-04').find((p) => p.personId === 'a')).toMatchObject({ status: 'UNMARKED' });
   });
 
   it('treats an open-ended span as covering every later date', () => {
@@ -35,9 +35,9 @@ describe('effectiveStatuses', () => {
     expect(effectiveStatuses(people, spans, new Set(), '2026-12-25').find((p) => p.personId === 'a')).toMatchObject({ status: 'OTHERS', subType: 'COURSE' });
   });
 
-  it('lets a confirmed Present mark override a covering span for that event only', () => {
+  it('lets a Present mark override a covering span for that event only', () => {
     const spans = [span({})];
-    expect(effectiveStatuses(people, spans, new Set(['a']), '2026-09-06').find((p) => p.personId === 'a')).toMatchObject({ status: 'PRESENT', confirmed: true });
+    expect(effectiveStatuses(people, spans, new Set(['a']), '2026-09-06').find((p) => p.personId === 'a')).toMatchObject({ status: 'PRESENT' });
     expect(effectiveStatuses(people, spans, new Set(), '2026-09-06').find((p) => p.personId === 'a')).toMatchObject({ status: 'MC' });
   });
 
@@ -49,6 +49,6 @@ describe('effectiveStatuses', () => {
   it('keeps RSI to its single day', () => {
     const spans = [span({ status: 'RSI', startDate: '2026-09-06', endDate: '2026-09-06' })];
     expect(effectiveStatuses(people, spans, new Set(), '2026-09-06').find((p) => p.personId === 'a')?.status).toBe('RSI');
-    expect(effectiveStatuses(people, spans, new Set(), '2026-09-07').find((p) => p.personId === 'a')?.status).toBe('PRESENT');
+    expect(effectiveStatuses(people, spans, new Set(), '2026-09-07').find((p) => p.personId === 'a')?.status).toBe('UNMARKED');
   });
 });

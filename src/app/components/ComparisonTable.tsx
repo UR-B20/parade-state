@@ -34,6 +34,7 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
             {COLS.map((c) => (
               <th key={c.key} scope="col">{c.label}</th>
             ))}
+            <th scope="col">Unmarked</th>
             <th scope="col" className="ctable__text">Status</th>
             <th scope="col">Submitted</th>
           </tr>
@@ -53,6 +54,7 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
                   <td key={c.key} className={n === 0 ? 'zero' : `col-${c.key}`}>{n}</td>
                 );
               })}
+              <td className={r.counts.unmarked === 0 ? 'zero' : 'col-UNMARKED'}>{r.counts.unmarked}</td>
               <td className="ctable__text"><SubmissionChip state={r.submission} compact /></td>
               <td>{submittedAt(r.submission)}</td>
             </tr>
@@ -65,6 +67,7 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
             {COLS.map((c) => (
               <td key={c.key}>{cell(summary.totals, c.key)}</td>
             ))}
+            <td>{summary.totals.unmarked}</td>
             <td className="ctable__text">{summary.unitsSubmitted} of {summary.unitsTotal} submitted</td>
             <td></td>
           </tr>

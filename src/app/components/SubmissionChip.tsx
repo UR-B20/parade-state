@@ -21,7 +21,7 @@ export function SubmissionChip({ state, compact }: { state: SubmissionState; com
 export function submissionNote(state: SubmissionState): string | null {
   switch (state.kind) {
     case 'NOT_MARKED': return 'Nothing marked yet';
-    case 'LATE': return state.hasActivity ? 'Marked, not submitted' : 'Nothing marked';
+    case 'LATE': return state.hasActivity ? 'Marked, not submitted' : 'Nothing marked yet';
     case 'SUBMITTED':
     case 'RESUBMITTED':
       return state.hasChanges ? 'Changes since submission' : state.wasLate ? 'Submitted after cut-off' : null;

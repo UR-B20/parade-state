@@ -34,8 +34,15 @@ describe('submissions', () => {
     expect((await h.request(`/units/COY1/submissions/${AM}`, { method: 'POST', as: admin })).status).toBe(403);
   });
 
-  it('submits v1 with a snapshot and notifies every active admin', async () => {
+  it('refuses to submit while anyone is unmarked', async () => {
     await h.json(`/units/COY1/attendance/${AM}/persons/${daniel}`, { method: 'PUT', as: cdr1, json: { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-08' } });
+    const res = await h.json<{ error: { code: string; message: string } }>(`/units/COY1/submissions/${AM}`, { method: 'POST', as: cdr1 });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/1 person is not yet marked/);
+  });
+
+  it('submits v1 with a snapshot and notifies every active admin', async () => {
+    await h.json(`/units/COY1/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: cdr1 });
     const res = await submitCoy1();
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ version: 1, submittedByName: 'MAJ Lim', counts: { strength: 2, present: 1, mc: 1 } });
@@ -70,10 +77,25 @@ describe('submissions', () => {
     expect(history.body.map((s) => s.version)).toEqual([2, 1]);
   });
 
-  it('confirming a default Present is not a change', async () => {
+  it('re-marking an already Present person is not a change', async () => {
     const amir = (await attendance()).body.persons.find((p) => p.name === 'Amir Rahman')!;
     await h.json(`/units/COY1/attendance/${AM}/persons/${amir.personId}`, { method: 'PUT', as: cdr1, json: { action: 'PRESENT' } });
     expect((await attendance()).body.submission).toMatchObject({ hasChanges: false });
+  });
+
+  it('an ad hoc event is pre-filled from the last submitted parade state', async () => {
+    // Coy 1 last submitted v2: Daniel Present (Back to Present), Amir Present. Give Daniel a new MC afterwards.
+    await h.json(`/units/COY1/attendance/${AM}/persons/${daniel}`, { method: 'PUT', as: cdr1, json: { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-09' } });
+    const created = await h.json<{ id: string }>('/events', { method: 'POST', as: admin, json: { date: '2026-09-06', name: 'Route march', cutoffTime: '16:00' } });
+    expect(created.status).toBe(201);
+    const view = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${created.body.id}`, { as: cdr1 });
+    const byName = Object.fromEntries(view.body.persons.map((p) => [p.name, p.status]));
+    // Amir was submitted Present -> pre-filled Present. Daniel's new MC covers the day, so the span wins.
+    expect(byName).toEqual({ 'Amir Rahman': 'PRESENT', 'Daniel Tan': 'MC' });
+    expect(view.body.submission.kind).toBe('NOT_MARKED');
+    // Coy 2 never submitted, so nothing is pre-filled there.
+    const coy2 = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${created.body.id}`, { as: cdr2 });
+    expect(coy2.body.counts).toMatchObject({ unmarked: 1, present: 0 });
   });
 
   it('marks and reads notifications', async () => {
@@ -108,6 +130,7 @@ describe('late notifications', () => {
     expect(coy2.body.submission.kind).toBe('LATE');
     // A submission after cut-off is recorded as late but still counts. Real time, not the demo clock, stamps it.
     h.clock.now = new Date('2026-09-06T02:10:00.000Z');
+    await h.json(`/units/COY2/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: cdr2 });
     const lateSub = await h.json<SubmissionDto>(`/units/COY2/submissions/${AM}`, { method: 'POST', as: cdr2 });
     expect(lateSub.status).toBe(201);
     expect((await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${AM}`, { as: cdr2 })).body.submission).toMatchObject({ kind: 'SUBMITTED', wasLate: true });

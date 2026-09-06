@@ -31,8 +31,8 @@
   --rsi-tint: #f7ece9;
   --others: #637181;
   --others-tint: #eef1f4;
-  --default-present: #8a96a8;
-  --default-present-tint: #f1f3f6;
+  --unmarked: #8a96a8;
+  --unmarked-tint: #eef1f5;
 
   /* Reporting states */
   --ok: #1f7a46;

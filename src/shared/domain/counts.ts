@@ -1,7 +1,7 @@
 import type { EffectiveStatus, UnitCounts } from '../types';
 
 export const EMPTY_COUNTS: UnitCounts = {
-  strength: 0, present: 0, presentConfirmed: 0, presentDefault: 0,
+  strength: 0, present: 0, unmarked: 0,
   mc: 0, ll: 0, ma: 0, rsi: 0, others: 0, absent: 0,
 };
 
@@ -10,11 +10,8 @@ export function unitCounts(statuses: readonly EffectiveStatus[]): UnitCounts {
   for (const s of statuses) {
     c.strength += 1;
     switch (s.status) {
-      case 'PRESENT':
-        c.present += 1;
-        if (s.confirmed) c.presentConfirmed += 1;
-        else c.presentDefault += 1;
-        break;
+      case 'PRESENT': c.present += 1; break;
+      case 'UNMARKED': c.unmarked += 1; break;
       case 'MC': c.mc += 1; break;
       case 'LL': c.ll += 1; break;
       case 'MA': c.ma += 1; break;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, formatSgDateLong, formatSgDateShort, type IsoDate } from '@shared/dates';
-import { ABSENCE_STATUSES, isMultiDay, OTHERS_SUB_TYPES, STATUS_LABEL, STATUS_LONG_LABEL, SUB_TYPE_LABEL, type OthersSubType, type Status } from '@shared/statuses';
+import { ABSENCE_STATUSES, isMultiDay, OTHERS_SUB_TYPES, STATUS_LABEL, STATUS_LONG_LABEL, SUB_TYPE_LABEL, type AbsenceStatus, type OthersSubType } from '@shared/statuses';
 import type { EffectiveStatus, MarkBody } from '@shared/types';
 import { Button } from './Button';
 import { Icon } from './Icon';
@@ -13,13 +13,19 @@ interface StatusSheetProps {
   person: EffectiveStatus | null;
   eventDate: IsoDate;
   eventLabel: string;
+  /** Open with Not present already chosen (from the row button). */
+  startNotPresent?: boolean;
   busy?: boolean;
   onSave: (body: MarkBody) => void;
   onClose: () => void;
 }
 
+type Choice = 'PRESENT' | 'NOT_PRESENT';
+
 interface Draft {
-  status: Status;
+  choice: Choice;
+  /** Absence reason; null until one is picked. */
+  status: AbsenceStatus | null;
   subType: OthersSubType | null;
   startDate: IsoDate;
   endDate: IsoDate;
@@ -27,10 +33,11 @@ interface Draft {
   remark: string;
 }
 
-function draftFor(person: EffectiveStatus, eventDate: IsoDate): Draft {
-  const absent = person.status !== 'PRESENT';
+function draftFor(person: EffectiveStatus, eventDate: IsoDate, startNotPresent: boolean): Draft {
+  const absent = person.status !== 'PRESENT' && person.status !== 'UNMARKED';
   return {
-    status: person.status,
+    choice: absent || startNotPresent ? 'NOT_PRESENT' : person.status === 'PRESENT' ? 'PRESENT' : startNotPresent ? 'NOT_PRESENT' : 'PRESENT',
+    status: absent ? (person.status as AbsenceStatus) : null,
     subType: person.subType,
     startDate: absent && person.startDate ? person.startDate : eventDate,
     endDate: absent && person.endDate ? person.endDate : eventDate,
@@ -39,7 +46,7 @@ function draftFor(person: EffectiveStatus, eventDate: IsoDate): Draft {
   };
 }
 
-export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClose }: StatusSheetProps) {
+export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = false, busy, onSave, onClose }: StatusSheetProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<{ field: string; message: string } | null>(null);
@@ -48,20 +55,21 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
     const el = ref.current;
     if (!el) return;
     if (person) {
-      setDraft(draftFor(person, eventDate));
+      setDraft(draftFor(person, eventDate, startNotPresent));
       setError(null);
       if (!el.open) el.showModal();
     } else if (el.open) {
       el.close();
     }
-  }, [person, eventDate]);
+  }, [person, eventDate, startNotPresent]);
 
-  const hasOngoingAbsence = !!person && person.status !== 'PRESENT' && person.spanId !== null;
+  const hasOngoingAbsence = !!person && person.status !== 'PRESENT' && person.status !== 'UNMARKED' && person.spanId !== null;
   const ongoingRunsPast = hasOngoingAbsence && (person!.endDate === null || person!.endDate > eventDate);
 
   const validation = useMemo(() => {
     if (!draft) return null;
-    if (draft.status === 'PRESENT') return null;
+    if (draft.choice === 'PRESENT') return null;
+    if (!draft.status) return { field: 'status', message: 'Choose why they are not present' };
     if (draft.status === 'OTHERS' && !draft.subType) return { field: 'subType', message: 'Choose a type for Others' };
     if (isMultiDay(draft.status)) {
       if (draft.startDate > eventDate) return { field: 'startDate', message: 'Start date cannot be after the parade date' };
@@ -80,9 +88,9 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
     setDraft((d) => (d ? { ...d, ...patch } : d));
   };
 
-  const pickStatus = (status: Status) => {
+  const pickStatus = (status: AbsenceStatus) => {
     if (!draft) return;
-    const patch: Partial<Draft> = { status };
+    const patch: Partial<Draft> = { status, choice: 'NOT_PRESENT' };
     if (status === 'RSI') {
       patch.startDate = eventDate;
       patch.endDate = eventDate;
@@ -90,7 +98,7 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
     } else if (status !== 'OTHERS') {
       patch.subType = null;
     }
-    if (status !== 'PRESENT' && person.status === 'PRESENT') {
+    if (person.status === 'PRESENT' || person.status === 'UNMARKED') {
       // Fresh absence: default to a span starting today, ending today, so the user chooses the end.
       patch.startDate = eventDate;
       patch.endDate = draft.endDate < eventDate ? eventDate : draft.endDate;
@@ -104,7 +112,7 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
       setError(validation);
       return;
     }
-    if (draft.status === 'PRESENT') {
+    if (draft.choice === 'PRESENT' || !draft.status) {
       onSave({ action: 'PRESENT' });
       return;
     }
@@ -118,8 +126,8 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
     });
   };
 
-  const showDates = !!draft && draft.status !== 'PRESENT' && isMultiDay(draft.status);
-  const currentDefault = person.status === 'PRESENT' && !person.confirmed;
+  const showDates = !!draft && draft.choice === 'NOT_PRESENT' && !!draft.status && isMultiDay(draft.status);
+  const currentUnmarked = person.status === 'UNMARKED';
 
   return (
     <dialog
@@ -137,8 +145,8 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
           </h2>
           <div className="sheet-current dialog__subtitle">
             Now
-            <StatusPill status={person.status} isDefault={currentDefault} />
-            <span>{person.status === 'PRESENT' ? (currentDefault ? 'not yet marked' : `for ${eventLabel}`) : describeStatus(person, eventDate).replace(/^[^·]+· /, '')}</span>
+            <StatusPill status={person.status} />
+            <span>{currentUnmarked ? `for ${eventLabel}` : person.status === 'PRESENT' ? `for ${eventLabel}` : describeStatus(person, eventDate).replace(/^[^·]+· /, '')}</span>
           </div>
         </div>
         <Button variant="ghost" small onClick={onClose} disabled={busy} aria-label="Cancel and close">
@@ -148,23 +156,38 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
 
       {draft && (
         <div className="dialog__body">
-          <div className="status-grid" role="group" aria-label="Status">
-            {(['PRESENT', ...ABSENCE_STATUSES] as Status[]).map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`status-opt status-opt--${s}`}
-                aria-pressed={draft.status === s}
-                onClick={() => pickStatus(s)}
-                title={STATUS_LONG_LABEL[s]}
-              >
-                {STATUS_LABEL[s]}
-                {s !== 'PRESENT' && STATUS_LABEL[s] !== STATUS_LONG_LABEL[s] && <small>{STATUS_LONG_LABEL[s]}</small>}
-              </button>
-            ))}
+          <div className="choice-grid" role="group" aria-label="Attendance">
+            <button type="button" className="choice-opt choice-opt--present" aria-pressed={draft.choice === 'PRESENT'} onClick={() => update({ choice: 'PRESENT' })}>
+              Present
+            </button>
+            <button type="button" className="choice-opt choice-opt--absent" aria-pressed={draft.choice === 'NOT_PRESENT'} onClick={() => update({ choice: 'NOT_PRESENT' })}>
+              Not present
+            </button>
           </div>
 
-          {draft.status === 'OTHERS' && (
+          {draft.choice === 'NOT_PRESENT' && (
+            <div className="field">
+              <span className="field__label" id="reason-label">Reason</span>
+              <div className="status-grid" role="group" aria-labelledby="reason-label">
+                {ABSENCE_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className={`status-opt status-opt--${s}`}
+                    aria-pressed={draft.status === s}
+                    onClick={() => pickStatus(s)}
+                    title={STATUS_LONG_LABEL[s]}
+                  >
+                    {STATUS_LABEL[s]}
+                    {STATUS_LABEL[s] !== STATUS_LONG_LABEL[s] && <small>{STATUS_LONG_LABEL[s]}</small>}
+                  </button>
+                ))}
+              </div>
+              {error?.field === 'status' && <span className="field__error" role="alert">{error.message}</span>}
+            </div>
+          )}
+
+          {draft.choice === 'NOT_PRESENT' && draft.status === 'OTHERS' && (
             <div className="field">
               <span className="field__label" id="subtype-label">Type</span>
               <div className="subtype-grid" role="group" aria-labelledby="subtype-label">
@@ -234,7 +257,7 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
             </>
           )}
 
-          {draft.status === 'RSI' && (
+          {draft.choice === 'NOT_PRESENT' && draft.status === 'RSI' && (
             <div className="sheet-note">
               <Icon name="info" size={18} />
               <span>
@@ -243,7 +266,7 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
             </div>
           )}
 
-          {draft.status === 'PRESENT' && ongoingRunsPast && (
+          {draft.choice === 'PRESENT' && ongoingRunsPast && person.status !== 'PRESENT' && person.status !== 'UNMARKED' && (
             <div className="sheet-note">
               <Icon name="info" size={18} />
               <span>
@@ -253,7 +276,7 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
             </div>
           )}
 
-          {draft.status !== 'PRESENT' && (
+          {draft.choice === 'NOT_PRESENT' && draft.status && (
             <label className="field">
               <span className="field__label">Remark (optional)</span>
               <input
@@ -273,7 +296,7 @@ export function StatusSheet({ person, eventDate, eventLabel, busy, onSave, onClo
         <Button variant="primary" block busy={busy} onClick={save}>
           Save
         </Button>
-        {hasOngoingAbsence && (
+        {hasOngoingAbsence && person.status !== 'PRESENT' && person.status !== 'UNMARKED' && (
           <Button variant="ghost" block disabled={busy} onClick={() => onSave({ action: 'BACK_TO_PRESENT' })}>
             Back to Present · ends the {STATUS_LABEL[person.status]}
           </Button>

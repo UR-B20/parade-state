@@ -268,11 +268,14 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
       addSpan(take(), 'OTHERS', subType, addDays(date, -rng.int(0, 6)), addDays(date, rng.int(3, 14)), rng.pick(OTHERS_REMARKS[subType]));
     }
 
-    // Confirmed Present marks for the AM parade.
+    // Present marks for the AM parade. Submitted units are fully marked; S2 has not started;
+    // Coy 1 (pending) still has ten people to mark, which shows the blocked-submit state.
     const presentPeople = unitPeople.filter((p) => !absentIds.has(p.id));
-    const confirmShare = spec.id === 'S2' ? 0 : spec.id === 'COY1' ? 0.6 : 0.97;
+    const fixedNames = new Set(fixed.map((f) => f.name));
+    const leaveUnmarked = spec.id === 'S2' ? presentPeople.length : spec.id === 'COY1' ? 10 : 0;
+    const unmarkedIds = new Set(rng.shuffle(presentPeople.filter((p) => !fixedNames.has(p.name))).slice(0, leaveUnmarked).map((p) => p.id));
     for (const p of presentPeople) {
-      if (rng.next() < confirmShare) {
+      if (!unmarkedIds.has(p.id)) {
         marks.push({ eventId: am.id, personId: p.id, unitId: spec.id, markedBy: commander.id, markedAt: sgLocalToIso(date, `0${rng.int(7, 8)}:${String(rng.int(10, 59))}`) });
       }
     }

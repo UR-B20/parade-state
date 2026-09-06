@@ -34,6 +34,10 @@ export const SUB_TYPE_LABEL: Record<OthersSubType, string> = {
   DUTY: 'Duty',
 };
 
+/** A person's effective state for one event: marked Present, an absence, or not yet marked. */
+export type EffectiveKind = Status | 'UNMARKED';
+export const UNMARKED_LABEL = 'Not yet marked';
+
 /** MC, LL, MA and Others can span several days. RSI applies to the selected day only. */
 export function isMultiDay(status: AbsenceStatus): boolean {
   return status !== 'RSI';

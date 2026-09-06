@@ -21,10 +21,10 @@ beforeAll(async () => {
 afterAll(async () => { await h.close(); });
 
 describe('battalion summary on the demo battalion', () => {
-  it('matches the brief at 09:24: 287 / 312, 25 absent, 6 of 8 submitted, awaiting units first', async () => {
+  it('shows the battalion at 09:24: 263 / 312 marked present, 24 not yet marked, 25 absent, 6 of 8 submitted', async () => {
     const { status, body } = await h.json<BattalionSummaryDto>(`/admin/summary/${AM}`, { as: admin });
     expect(status).toBe(200);
-    expect(body.totals).toMatchObject({ strength: 312, present: 287, absent: 25, mc: 9, ll: 5, ma: 4, rsi: 3, others: 4 });
+    expect(body.totals).toMatchObject({ strength: 312, present: 263, unmarked: 24, absent: 25, mc: 9, ll: 5, ma: 4, rsi: 3, others: 4 });
     expect(body.unitsSubmitted).toBe(6);
     expect(body.unitsTotal).toBe(8);
     expect(body.units.slice(0, 2).map((u) => [u.unit.name, u.submission.kind])).toEqual([['Coy 1', 'PENDING'], ['S2', 'NOT_MARKED']]);
@@ -32,7 +32,8 @@ describe('battalion summary on the demo battalion', () => {
     expect(ssp.submission).toMatchObject({ kind: 'RESUBMITTED', version: 2, hasChanges: false });
     expect(ssp.counts).toMatchObject({ strength: 24, present: 22, rsi: 1, others: 1 });
     const coy1 = body.units.find((u) => u.unit.name === 'Coy 1')!;
-    expect(coy1.counts).toMatchObject({ strength: 102, present: 96, mc: 2, ll: 1, ma: 1, rsi: 1, others: 1 });
+    expect(coy1.counts).toMatchObject({ strength: 102, present: 86, unmarked: 10, mc: 2, ll: 1, ma: 1, rsi: 1, others: 1 });
+    expect(body.units.find((u) => u.unit.name === 'S2')!.counts).toMatchObject({ present: 0, unmarked: 14 });
   });
 
   it('is admin only', async () => {
@@ -49,9 +50,9 @@ describe('battalion summary on the demo battalion', () => {
     expect(ethan).toMatchObject({ subType: 'COURSE', endDate: '2026-09-11' });
   });
 
-  it('the commander view of Coy 1 shows 96 / 102 pending with the brief\'s example rows', async () => {
+  it('the commander view of Coy 1 shows 86 / 102 pending with 10 to mark and the brief\'s example rows', async () => {
     const { body } = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${AM}`, { as: cdr1 });
-    expect(body.counts).toMatchObject({ present: 96, strength: 102 });
+    expect(body.counts).toMatchObject({ present: 86, unmarked: 10, strength: 102 });
     expect(body.submission.kind).toBe('PENDING');
     const names = Object.fromEntries(body.persons.map((p) => [p.name, p]));
     expect(names['Daniel Tan']).toMatchObject({ rank: 'CPL', status: 'MC', endDate: '2026-09-08' });
@@ -98,7 +99,8 @@ describe('export', () => {
     const summary = strFromU8(files['xl/worksheets/sheet1.xml']!);
     expect(summary).toContain('<t xml:space="preserve">Coy 1</t>');
     expect(summary).toContain('<c r="B13" s="1"><v>312</v></c>');
-    expect(summary).toContain('<v>287</v>');
+    expect(summary).toContain('<v>263</v>');
+    expect(summary).toContain('Unmarked');
     const abs = strFromU8(files['xl/worksheets/sheet2.xml']!);
     expect(abs).toContain('Daniel Tan');
     expect(abs).toContain('Fever, Bedok Polyclinic');

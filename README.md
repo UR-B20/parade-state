@@ -10,13 +10,19 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
 
 ## How attendance works
 
-- Unmarked personnel count as **Present by default**. The app shows this explicitly ("Not yet
-  marked") so S1 can tell default attendance from confirmed marks.
-- **MC, LL, MA and Others** can span several days. **RSI** applies to the selected day only.
-- Choosing **Present** confirms this event only; an ongoing absence keeps running. **Back to
-  Present** ends the absence from today.
-- Saving is automatic. **Submit to S1** snapshots the unit's attendance as a version; further
-  changes show as "changes since submission" until the unit **resubmits**.
+- Every person is marked explicitly with **Present** or **Not present**. Choosing Not present
+  opens the reason panel (MC, LL, MA, RSI, Others with a sub-type, dates and a remark). People
+  not yet marked count in neither present nor absent and are listed as "Not yet marked".
+- **Submit to S1** is only possible once everyone is marked. **Mark remaining Present** marks
+  everyone still unmarked in one confirmed step.
+- **MC, LL, MA and Others** can span several days and keep applying on later parades with
+  nothing to re-enter. **RSI** applies to the selected day only.
+- Choosing **Present** for someone with an ongoing absence marks this event only; the absence
+  keeps running. **Back to Present** ends the absence from today.
+- Saving is automatic. Submitting snapshots the unit's attendance as a version; further changes
+  show as "changes since submission" until the unit **resubmits**.
+- **Ad hoc events** created by S1 are pre-filled from each unit's last submitted parade state
+  on or before that date. AM and PM parades start unmarked.
 - Units become **Late** after the cut-off (AM 10:00, PM 14:00 by default, editable by S1).
 - Commanders can mark **today and future dates**. S1 can unlock a past date for 24 hours.
 
@@ -84,6 +90,7 @@ Set the Worker variable `DEMO_CONTROLS` to `"true"` and run `pnpm seed:demo` wit
 secrets exported. This loads the fictional battalion (312 personnel, Sun 6 Sep 2026) with demo
 accounts (`cdr.coy1@parade-state.demo`, `s1admin@parade-state.demo`, password `demo1234`) and
 enables the prototype controls (demo clock, simulated connection loss) in the account menu.
+In the demo, Coy 1 still has ten people to mark, S2 has not started, and six units have submitted.
 Never enable it on the production deployment.
 
 ## Operations notes

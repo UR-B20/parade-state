@@ -3,13 +3,13 @@ import { diffAgainstSnapshot, MarkValidationError, planMark, toSnapshot, type Sp
 import type { EffectiveStatus } from '@shared/types';
 
 const es = (over: Partial<EffectiveStatus>): EffectiveStatus => ({
-  personId: 'p', rank: 'PTE', name: 'X', status: 'PRESENT', confirmed: false, subType: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
+  personId: 'p', rank: 'PTE', name: 'X', status: 'PRESENT', subType: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
 });
 
 describe('diffAgainstSnapshot', () => {
   it('reports changed, added and removed personnel', () => {
-    const snapshot = toSnapshot([es({ personId: '1' }), es({ personId: '2', status: 'MC', confirmed: true, startDate: '2026-09-05', endDate: '2026-09-08' }), es({ personId: '3' })]);
-    const current = [es({ personId: '1', status: 'LL', confirmed: true, startDate: '2026-09-06', endDate: '2026-09-07' }), es({ personId: '2', status: 'MC', confirmed: true, startDate: '2026-09-05', endDate: '2026-09-08' }), es({ personId: '4', name: 'New' })];
+    const snapshot = toSnapshot([es({ personId: '1' }), es({ personId: '2', status: 'MC', startDate: '2026-09-05', endDate: '2026-09-08' }), es({ personId: '3' })]);
+    const current = [es({ personId: '1', status: 'LL', startDate: '2026-09-06', endDate: '2026-09-07' }), es({ personId: '2', status: 'MC', startDate: '2026-09-05', endDate: '2026-09-08' }), es({ personId: '4', name: 'New' })];
     const diff = diffAgainstSnapshot(snapshot, current);
     expect(diff.map((d) => d.personId).sort()).toEqual(['1', '3', '4']);
     expect(diff.find((d) => d.personId === '1')).toMatchObject({ before: { status: 'PRESENT' }, after: { status: 'LL' } });
@@ -17,9 +17,10 @@ describe('diffAgainstSnapshot', () => {
     expect(diff.find((d) => d.personId === '4')?.before).toBeNull();
   });
 
-  it('ignores confirmation-only changes', () => {
-    const snapshot = toSnapshot([es({ personId: '1', confirmed: false })]);
-    expect(diffAgainstSnapshot(snapshot, [es({ personId: '1', confirmed: true })])).toEqual([]);
+  it('reports an unmarked person who was later marked Present', () => {
+    const snapshot = toSnapshot([es({ personId: '1', status: 'UNMARKED' })]);
+    expect(diffAgainstSnapshot(snapshot, [es({ personId: '1', status: 'PRESENT' })])).toHaveLength(1);
+    expect(diffAgainstSnapshot(snapshot, [es({ personId: '1', status: 'UNMARKED' })])).toEqual([]);
   });
 });
 

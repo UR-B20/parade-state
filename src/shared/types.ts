@@ -1,4 +1,4 @@
-import type { AbsenceStatus, OthersSubType, Status } from './statuses';
+import type { AbsenceStatus, EffectiveKind, OthersSubType } from './statuses';
 import type { IsoDate, IsoTimestamp } from './dates';
 
 export type UnitId = 'S1' | 'S2' | 'S3' | 'S4' | 'SSP' | 'COY1' | 'COY2' | 'ISR';
@@ -64,17 +64,16 @@ export interface PersonDto {
   postedOutDate: IsoDate | null;
 }
 
-/** A person's status for one event, as derived by the server. */
+/**
+ * A person's status for one event, as derived by the server. Present is always an explicit
+ * mark; a person with no mark and no covering absence is UNMARKED and counts in neither
+ * present nor absent.
+ */
 export interface EffectiveStatus {
   personId: string;
   rank: string;
   name: string;
-  status: Status;
-  /**
-   * False only for the default Present of an unmarked person. The UI must show
-   * this as default attendance, not as a confirmed mark.
-   */
-  confirmed: boolean;
+  status: EffectiveKind;
   subType: OthersSubType | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;
@@ -85,9 +84,10 @@ export interface EffectiveStatus {
 
 export interface UnitCounts {
   strength: number;
+  /** Explicitly marked Present. */
   present: number;
-  presentConfirmed: number;
-  presentDefault: number;
+  /** Neither marked Present nor covered by an absence. */
+  unmarked: number;
   mc: number;
   ll: number;
   ma: number;
@@ -112,7 +112,7 @@ export type SubmissionState =
 export type SubmissionKind = SubmissionState['kind'];
 
 export interface StatusTuple {
-  status: Status;
+  status: EffectiveKind;
   subType: OthersSubType | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;

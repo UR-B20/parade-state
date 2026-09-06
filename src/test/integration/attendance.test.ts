@@ -74,10 +74,10 @@ describe('roll', () => {
 });
 
 describe('attendance', () => {
-  it('starts with everyone as default Present and no activity', async () => {
+  it('starts with everyone unmarked and no activity', async () => {
     const { status, body } = await attendance(AM);
     expect(status).toBe(200);
-    expect(body.counts).toMatchObject({ strength: 3, present: 3, presentDefault: 3, presentConfirmed: 0 });
+    expect(body.counts).toMatchObject({ strength: 3, present: 0, unmarked: 3, absent: 0 });
     expect(body.submission).toEqual({ kind: 'NOT_MARKED' });
     expect(body.updatedAt).toBeNull();
     expect(body.locked).toBe(false);
@@ -87,18 +87,18 @@ describe('attendance', () => {
     const daniel = people['Daniel Tan']!.id;
     const res = await mark(AM, daniel, { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-08', remark: ' Fever ' });
     expect(res.status).toBe(200);
-    expect(res.body.person).toMatchObject({ status: 'MC', confirmed: true, endDate: '2026-09-08', remark: 'Fever' });
-    expect(res.body.counts).toMatchObject({ present: 2, mc: 1, absent: 1 });
+    expect(res.body.person).toMatchObject({ status: 'MC', endDate: '2026-09-08', remark: 'Fever' });
+    expect(res.body.counts).toMatchObject({ present: 0, unmarked: 2, mc: 1, absent: 1 });
     expect(res.body.submission.kind).toBe('PENDING');
     expect(statusOf((await attendance(PM)).body, 'Daniel Tan').status).toBe('MC');
     expect(statusOf((await attendance('2026-09-08-AM')).body, 'Daniel Tan').status).toBe('MC');
-    expect(statusOf((await attendance('2026-09-09-AM')).body, 'Daniel Tan').status).toBe('PRESENT');
+    expect(statusOf((await attendance('2026-09-09-AM')).body, 'Daniel Tan').status).toBe('UNMARKED');
   });
 
-  it('PRESENT confirms this event only; the MC keeps running', async () => {
+  it('PRESENT marks this event only; the MC keeps running', async () => {
     const daniel = people['Daniel Tan']!.id;
     const res = await mark(AM, daniel, { action: 'PRESENT' });
-    expect(res.body.person).toMatchObject({ status: 'PRESENT', confirmed: true });
+    expect(res.body.person).toMatchObject({ status: 'PRESENT' });
     expect(statusOf((await attendance(PM)).body, 'Daniel Tan').status).toBe('MC');
   });
 
@@ -106,17 +106,17 @@ describe('attendance', () => {
     const daniel = people['Daniel Tan']!.id;
     await mark(AM, daniel, { action: 'SET', status: 'LL', startDate: '2026-09-06', endDate: '2026-09-07' });
     expect(statusOf((await attendance(AM)).body, 'Daniel Tan').status).toBe('LL');
-    // The earlier MC was truncated to nothing (it started today), so the 8th is Present again.
-    expect(statusOf((await attendance('2026-09-08-AM')).body, 'Daniel Tan').status).toBe('PRESENT');
+    // The earlier MC was truncated to nothing (it started today), so the 8th is unmarked again.
+    expect(statusOf((await attendance('2026-09-08-AM')).body, 'Daniel Tan').status).toBe('UNMARKED');
   });
 
   it('BACK_TO_PRESENT ends the absence from today and confirms Present', async () => {
     const daniel = people['Daniel Tan']!.id;
     const res = await mark(PM, daniel, { action: 'BACK_TO_PRESENT' });
-    expect(res.body.person).toMatchObject({ status: 'PRESENT', confirmed: true });
-    // The LL started today, so ending it from today removes it entirely: AM falls back to default Present.
-    expect(statusOf((await attendance(AM)).body, 'Daniel Tan')).toMatchObject({ status: 'PRESENT', confirmed: false });
-    expect(statusOf((await attendance(PM)).body, 'Daniel Tan')).toMatchObject({ status: 'PRESENT', confirmed: true });
+    expect(res.body.person).toMatchObject({ status: 'PRESENT' });
+    // The LL started today, so ending it from today removes it entirely: AM falls back to unmarked.
+    expect(statusOf((await attendance(AM)).body, 'Daniel Tan')).toMatchObject({ status: 'UNMARKED' });
+    expect(statusOf((await attendance(PM)).body, 'Daniel Tan')).toMatchObject({ status: 'PRESENT' });
   });
 
   it('RSI applies to the day only', async () => {
@@ -124,7 +124,18 @@ describe('attendance', () => {
     const res = await mark(AM, amir, { action: 'SET', status: 'RSI', startDate: '2026-09-01', endDate: null });
     expect(res.body.person).toMatchObject({ status: 'RSI', startDate: '2026-09-06', endDate: '2026-09-06' });
     expect(statusOf((await attendance(PM)).body, 'Amir Rahman').status).toBe('RSI');
-    expect(statusOf((await attendance('2026-09-07-AM')).body, 'Amir Rahman').status).toBe('PRESENT');
+    expect(statusOf((await attendance('2026-09-07-AM')).body, 'Amir Rahman').status).toBe('UNMARKED');
+  });
+
+  it('marks everyone still unmarked as Present in one call, leaving absences alone', async () => {
+    const before = (await attendance(AM)).body;
+    expect(before.counts.unmarked).toBeGreaterThan(0);
+    const res = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: cdr1 });
+    expect(res.status).toBe(200);
+    expect(res.body.counts.unmarked).toBe(0);
+    expect(statusOf(res.body, 'Amir Rahman').status).toBe('RSI');
+    expect(statusOf(res.body, 'Ryan Lim').status).toBe('PRESENT');
+    expect((await h.request(`/units/COY1/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: admin })).status).toBe(403);
   });
 
   it('validates mark bodies', async () => {

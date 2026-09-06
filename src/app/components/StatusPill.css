@@ -20,10 +20,10 @@
 .pill--RSI { --pill-bg: var(--rsi-tint); --pill-fg: var(--rsi); }
 .pill--OTHERS { --pill-bg: var(--others-tint); --pill-fg: var(--others); }
 
-/* Default attendance: unmarked people count as Present but are not confirmed. */
-.pill--default {
+/* Not yet marked: counts in neither present nor absent. */
+.pill--UNMARKED {
   --pill-bg: transparent;
-  --pill-fg: var(--default-present);
+  --pill-fg: var(--unmarked);
   border-color: var(--line-strong);
   border-style: dashed;
 }

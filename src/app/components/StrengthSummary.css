@@ -79,6 +79,7 @@
 .band__seg--MA { --seg: var(--ma); }
 .band__seg--RSI { --seg: var(--rsi); }
 .band__seg--OTHERS { --seg: var(--others); }
+.band__seg--UNMARKED { --seg: var(--line-strong); }
 
 .legend {
   display: flex;

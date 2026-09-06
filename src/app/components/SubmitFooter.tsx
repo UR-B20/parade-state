@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatSgTime } from '@shared/dates';
-import { STATUS_LABEL } from '@shared/statuses';
+import { STATUS_LABEL, UNMARKED_LABEL } from '@shared/statuses';
 import type { ChangeDiff, StatusTuple, SubmissionState, UnitCounts } from '@shared/types';
 import { Button } from './Button';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -17,27 +17,42 @@ interface SubmitFooterProps {
   save: { status: SaveStatus; pendingCount: number };
   locked: boolean;
   busy?: boolean;
+  bulkBusy?: boolean;
   onSubmit: () => Promise<unknown>;
+  /** Marks everyone still unmarked as Present. */
+  onMarkRemainingPresent: () => Promise<unknown>;
 }
 
 function tupleLabel(t: StatusTuple | null): string {
   if (!t) return 'Not on roll';
-  return STATUS_LABEL[t.status];
+  return t.status === 'UNMARKED' ? UNMARKED_LABEL : STATUS_LABEL[t.status];
 }
 
-export function SubmitFooter({ submission, counts, changes, updatedAt, save, locked, busy, onSubmit }: SubmitFooterProps) {
+export function SubmitFooter({ submission, counts, changes, updatedAt, save, locked, busy, bulkBusy, onSubmit, onMarkRemainingPresent }: SubmitFooterProps) {
   const [confirming, setConfirming] = useState(false);
+  const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
 
   const submitted = submission.kind === 'SUBMITTED' || submission.kind === 'RESUBMITTED';
   const hasChanges = submitted && submission.hasChanges;
-  const canSubmit = save.status === 'saved' && !locked && (!submitted || hasChanges);
+  const unmarked = counts.unmarked;
+  const canSubmit = save.status === 'saved' && !locked && unmarked === 0 && (!submitted || hasChanges);
 
   let statusLine: { text: string; tone?: 'warn' | 'danger' } = { text: '' };
   if (save.status === 'offline') statusLine = { text: `Connection lost · ${save.pendingCount} change${save.pendingCount === 1 ? '' : 's'} waiting`, tone: 'danger' };
   else if (save.status === 'saving') statusLine = { text: 'Saving…' };
+  else if (unmarked > 0) statusLine = { text: `Mark everyone before submitting · ${unmarked} left`, tone: 'warn' };
   else if (updatedAt) statusLine = { text: `All changes saved · Updated ${formatSgTime(updatedAt)}` };
-  else statusLine = { text: 'No changes yet · Unmarked personnel count as Present' };
+  else statusLine = { text: 'Everyone marked · Ready to submit' };
+
+  const confirmBulk = async () => {
+    try {
+      await onMarkRemainingPresent();
+      setConfirmingBulk(false);
+    } catch {
+      // Toast shown by the page; keep the dialog open.
+    }
+  };
 
   const confirm = async () => {
     try {
@@ -79,6 +94,13 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
           </ul>
         )}
 
+        {unmarked > 0 && !locked && (
+          <Button variant="secondary" block disabled={save.status === 'offline'} busy={bulkBusy} onClick={() => setConfirmingBulk(true)}>
+            <Icon name="check" size={18} />
+            Mark remaining {unmarked} Present
+          </Button>
+        )}
+
         {submitted && !hasChanges ? (
           <div className="footer__submitted num" role="status">
             <Icon name="check" size={20} />
@@ -90,6 +112,18 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
           </Button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmingBulk}
+        title={`Mark ${unmarked} ${unmarked === 1 ? 'person' : 'people'} Present?`}
+        confirmLabel={`Mark ${unmarked} Present`}
+        busy={bulkBusy}
+        onConfirm={confirmBulk}
+        onCancel={() => setConfirmingBulk(false)}
+      >
+        <p className="dialog__text">Everyone not yet marked will be recorded as Present for this event.</p>
+        <p className="dialog__muted">Mark anyone who is absent first, so they are not swept in. You can still change a person afterwards.</p>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={confirming}
@@ -105,11 +139,6 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
           <span className="confirm-figure__d">/ {counts.strength} present</span>
         </div>
         <StatusLegend counts={counts} />
-        {counts.presentDefault > 0 && (
-          <p className="dialog__muted num">
-            {counts.presentDefault} not yet marked and counted as Present by default.
-          </p>
-        )}
         {hasChanges && (
           <p className="dialog__muted">
             {changes.length} change{changes.length === 1 ? '' : 's'} since v{submission.kind === 'SUBMITTED' || submission.kind === 'RESUBMITTED' ? submission.version : 1} will be sent.

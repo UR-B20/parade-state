@@ -35,7 +35,7 @@ export async function absentees(db: Db, env: Bindings, event: EventRow, realNow:
   const groups = ABSENCE_STATUSES.map((status) => ({ status, items: [] as AbsenteeDto[] }));
   for (const { row, statuses } of await unitRows(db, event, now)) {
     for (const s of statuses) {
-      if (s.status === 'PRESENT') continue;
+      if (s.status === 'PRESENT' || s.status === 'UNMARKED') continue;
       groups.find((g) => g.status === s.status)!.items.push({
         personId: s.personId, rank: s.rank, name: s.name, unitId: row.unit.id, unitName: row.unit.name,
         status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark,

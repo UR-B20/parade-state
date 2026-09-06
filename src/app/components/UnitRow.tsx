@@ -47,7 +47,7 @@ export function UnitRow({ row, eventId, date }: { row: UnitSummaryRow; eventId: 
         </span>
         <span className="unit__state">
           <SubmissionChip state={row.submission} />
-          {note && <span className="truncate">{note}</span>}
+          {row.counts.unmarked > 0 ? <span className="truncate num">{row.counts.unmarked} not yet marked</span> : note && <span className="truncate">{note}</span>}
         </span>
         <Icon name="chevronDown" className="unit__caret" />
       </button>
@@ -56,7 +56,7 @@ export function UnitRow({ row, eventId, date }: { row: UnitSummaryRow; eventId: 
           <CountGrid counts={row.counts} />
           <div className="unit__links">
             <span className="num">
-              {row.counts.presentDefault > 0 ? `${row.counts.presentDefault} not yet marked, counted as Present by default` : 'All personnel marked'}
+              {row.counts.unmarked > 0 ? `${row.counts.unmarked} not yet marked` : 'Everyone marked'}
             </span>
             <Link to={`/admin/units/${row.unit.id}?date=${date}&event=${eventId}`} className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}>
               View roll <Icon name="chevronRight" size={16} />

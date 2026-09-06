@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { IsoDate } from '@shared/dates';
 import {
-  contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, MarkValidationError, planMark, unitCounts,
+  contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, MarkValidationError, planMark, planMarkRemainingPresent, unitCounts,
   type SpanRow,
 } from '@shared/domain';
 import type { ChangeDiff, EffectiveStatus, MarkBody, MarkResultDto, SubmissionState, UnitAttendanceDto, UnitCounts, UnitDto, UnitId } from '@shared/types';
@@ -129,6 +129,19 @@ export async function applyMark(db: Db, env: Bindings, unitId: string, event: Ev
   const row = statuses.find((s) => s.personId === personId);
   if (!row) throw new AppError('INTERNAL', 'Marked person missing from the recomputed roll');
   return { person: row, counts, submission: sub.state, changes: sub.changes, updatedAt: realNow.toISOString(), contentHash: hash };
+}
+
+/** Marks everyone still unmarked as Present in one transaction and returns the refreshed view. */
+export async function markRemainingPresent(db: Db, env: Bindings, unitId: string, event: EventRow, user: ProfileRow, realNow: Date): Promise<UnitAttendanceDto> {
+  const { statuses } = await computeUnit(db, unitId, event);
+  const ids = planMarkRemainingPresent(statuses);
+  if (ids.length > 0) {
+    await db.transaction(async (tx) => {
+      await tx.insert(eventMarks).values(ids.map((personId) => ({ eventId: event.id, personId, unitId, markedBy: user.id, markedAt: realNow }))).onConflictDoNothing();
+      await touchUnitEvent(tx, unitId, event.id, user.id, realNow);
+    });
+  }
+  return loadUnitState(db, env, unitId, event, user, realNow);
 }
 
 export async function assertEventDateEditable(db: Db, env: Bindings, event: EventRow, user: ProfileRow, realNow: Date): Promise<void> {

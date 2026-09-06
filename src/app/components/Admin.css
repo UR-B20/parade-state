@@ -279,6 +279,7 @@
 .ctable .col-MA { color: var(--ma); }
 .ctable .col-RSI { color: var(--rsi); }
 .ctable .col-OTHERS { color: var(--others); }
+.ctable .col-UNMARKED { color: var(--warn); font-weight: 600; }
 
 /* Export */
 .export {

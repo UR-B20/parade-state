@@ -5,6 +5,7 @@ import type { Db } from '../db/client';
 import { events, type EventRow } from '../db/schema';
 import { notFound } from '../errors';
 import type { Settings } from './settings';
+import { prefillFromLastSubmission } from './prefill';
 
 export function toEventDto(e: EventRow): EventDto {
   return {
@@ -43,12 +44,13 @@ export async function getEvent(db: Db, id: string, settings: Settings): Promise<
   return row;
 }
 
-export async function createAdhocEvent(db: Db, input: { date: IsoDate; name: string; cutoffTime: string }, createdBy: string): Promise<EventDto> {
+export async function createAdhocEvent(db: Db, input: { date: IsoDate; name: string; cutoffTime: string }, createdBy: string, realNow: Date): Promise<EventDto> {
   const id = `${input.date}-X-${crypto.randomUUID().slice(0, 8)}`;
   const [row] = await db
     .insert(events)
     .values({ id, date: input.date, type: 'ADHOC', name: input.name, cutoffAt: sgLocalToInstant(input.date, input.cutoffTime), createdBy })
     .returning();
+  await prefillFromLastSubmission(db, row!, createdBy, realNow);
   return toEventDto(row!);
 }
 

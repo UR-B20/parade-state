@@ -140,7 +140,7 @@ export function DashboardPage() {
                 cutoff={cutoff}
                 note={
                   <span className="num">
-                    {summary.totals.absent} absent · {summary.totals.presentDefault} not yet marked and counted as Present by default
+                    {summary.totals.absent} absent · {summary.totals.unmarked} not yet marked
                   </span>
                 }
               />

@@ -35,6 +35,8 @@ export interface ApiClient {
 
   unitAttendance(unitId: string, eventId: string): Promise<UnitAttendanceDto>;
   mark(unitId: string, eventId: string, personId: string, body: MarkBody): Promise<MarkResultDto>;
+  /** Marks everyone still unmarked as Present. */
+  markRemainingPresent(unitId: string, eventId: string): Promise<UnitAttendanceDto>;
   submit(unitId: string, eventId: string): Promise<SubmissionDto>;
   submissions(unitId: string, eventId: string): Promise<SubmissionDto[]>;
 

@@ -2,8 +2,8 @@ import type { EffectiveStatus, StatusTuple } from '../types';
 
 /**
  * Canonical text of a unit's attendance for one event, used for the content hash.
- * One line per active person, sorted by person id. The `confirmed` flag is deliberately
- * excluded: confirming a default Present is not a change S1 needs to review.
+ * One line per active person, sorted by person id. UNMARKED people are included, so marking
+ * them after a submission counts as a change.
  */
 export function canonicalizeUnitState(statuses: readonly EffectiveStatus[]): string {
   return [...statuses]

@@ -16,12 +16,11 @@ export interface MarkVariables {
 /** Optimistic local view of a mark, before the server confirms it. */
 function optimisticPerson(person: EffectiveStatus, body: MarkBody): EffectiveStatus {
   if (body.action === 'PRESENT' || body.action === 'BACK_TO_PRESENT') {
-    return { ...person, status: 'PRESENT', confirmed: true, subType: null, startDate: null, endDate: null, remark: null, spanId: null };
+    return { ...person, status: 'PRESENT', subType: null, startDate: null, endDate: null, remark: null, spanId: null };
   }
   return {
     ...person,
     status: body.status,
-    confirmed: true,
     subType: body.status === 'OTHERS' ? body.subType ?? null : null,
     startDate: body.startDate,
     endDate: body.endDate,
@@ -63,6 +62,15 @@ export function useMarkPerson() {
         });
       }
     },
+  });
+}
+
+export function useMarkRemainingPresent(unitId: string, eventId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.markRemainingPresent(unitId, eventId),
+    onSuccess: (dto) => qc.setQueryData<UnitAttendanceDto>(keys.attendance(unitId, eventId), dto),
   });
 }
 

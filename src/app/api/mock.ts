@@ -11,7 +11,7 @@ import type {
 } from '@shared/types';
 import {
   awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, isDateLocked,
-  MarkValidationError, planMark, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
+  MarkValidationError, planMark, planMarkRemainingPresent, toSnapshot, unitCounts, sumCounts, type SnapshotEntry, type SpanRow,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
@@ -202,6 +202,20 @@ export class MockApi implements ApiClient {
     return this.wait(() => {
       const ev: MockAdhoc = { id: `${body.date}-X-${this.newId('ev')}`, date: body.date, type: 'ADHOC', name: body.name, cutoffAt: sgLocalToIso(body.date, body.cutoffTime), label: body.name };
       this.adhoc.push(ev);
+      // Pre-fill from each unit's last submitted parade state on or before this date.
+      const user = this.currentUser();
+      for (const unit of this.data.units) {
+        const latest = this.data.submissions
+          .filter((s) => s.unitId === unit.id && this.eventById(s.eventId).date <= ev.date && s.submittedAt <= this.nowIso())
+          .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1))[0];
+        if (!latest) continue;
+        const active = new Set(this.data.personnel.filter((p) => p.unitId === unit.id && p.postedInDate <= ev.date && (p.postedOutDate === null || p.postedOutDate > ev.date)).map((p) => p.id));
+        for (const entry of latest.snapshot) {
+          if (entry.status === 'PRESENT' && active.has(entry.personId)) {
+            this.data.marks.push({ eventId: ev.id, personId: entry.personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
+          }
+        }
+      }
       return ev;
     });
   }
@@ -294,12 +308,29 @@ export class MockApi implements ApiClient {
     });
   }
 
+  markRemainingPresent(unitId: string, eventId: string): Promise<UnitAttendanceDto> {
+    return this.wait(async () => {
+      const unit = this.unit(unitId);
+      const event = this.eventById(eventId);
+      const user = this.currentUser();
+      if (user.role !== 'ADMIN' && isDateLocked(event.date, this.today(), this.unlocks, this.now())) {
+        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 to unlock it to make corrections.', 403);
+      }
+      const { statuses } = this.computeUnit(unitId, event);
+      const ids = planMarkRemainingPresent(statuses);
+      for (const personId of ids) this.data.marks.push({ eventId, personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
+      if (ids.length) this.touch(unit.id, eventId, user.id);
+      return this.unitAttendance(unitId, eventId);
+    });
+  }
+
   submit(unitId: string, eventId: string): Promise<SubmissionDto> {
     return this.wait(async () => {
       const unit = this.unit(unitId);
       const event = this.eventById(eventId);
       const user = this.currentUser();
       const { statuses, counts } = this.computeUnit(unitId, event);
+      if (counts.unmarked > 0) throw new ApiError('VALIDATION', `${counts.unmarked} ${counts.unmarked === 1 ? 'person is' : 'people are'} not yet marked. Mark everyone before submitting.`, 400);
       const hash = await contentHash(statuses);
       const existing = this.data.submissions.filter((s) => s.unitId === unitId && s.eventId === eventId).sort((a, b) => b.version - a.version);
       const latest = existing[0];
@@ -363,7 +394,7 @@ export class MockApi implements ApiClient {
       for (const unit of this.data.units) {
         const { statuses } = this.computeUnit(unit.id, event);
         for (const s of statuses) {
-          if (s.status === 'PRESENT') continue;
+          if (s.status === 'PRESENT' || s.status === 'UNMARKED') continue;
           groups.find((g) => g.status === s.status)!.items.push({ personId: s.personId, rank: s.rank, name: s.name, unitId: unit.id, unitName: unit.name, status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark });
         }
       }

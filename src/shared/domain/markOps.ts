@@ -24,6 +24,11 @@ export interface MarkPlan {
   upsertPresentMark: boolean;
 }
 
+/** Ids of everyone still unmarked, for the "Mark remaining Present" bulk action. */
+export function planMarkRemainingPresent(statuses: readonly { personId: string; status: string }[]): string[] {
+  return statuses.filter((s) => s.status === 'UNMARKED').map((s) => s.personId);
+}
+
 export class MarkValidationError extends Error {
   constructor(message: string, readonly field?: string) {
     super(message);
