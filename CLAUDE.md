@@ -138,6 +138,13 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   reach any external site through the proxy, so live checks are API-level: `scripts/live-check.mjs`
   (Node fetch with `NODE_USE_ENV_PROXY=1`, `connection: close`, retries; `--cleanup` removes
   the throwaway data).
+- Live verification (6 Sep, 19:40Z): the Worker itself is healthy. Worker logs show every
+  request completing in 2–5 s with 0 errors; what looked like hangs from the remote Claude
+  environment were responses lost on its outbound proxy path whenever a response took more
+  than a few seconds. Do not "fix" the app for that again. Hyperdrive `soldiertrack-db` is
+  bound in `wrangler.jsonc`; `/api/admin/health` (admin-only) times each database step.
+  `scripts/live-check.mjs` marks reads whose responses never arrive as UNVERIFIED and always
+  cleans up; the definitive check of the S1 screens is the owner's own browser in Singapore.
 - Next: follow `docs/go-live.md`.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.
