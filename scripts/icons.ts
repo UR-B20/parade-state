@@ -1,4 +1,4 @@
-/** Renders the SVG mark to the PNG icons the manifest needs. Run: npx tsx scripts/icons.ts */
+/** Renders the SoldierTrack badge (public/favicon.svg) to the PNG icons the manifest needs. Run: npx tsx scripts/icons.ts */
 import { chromium } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -7,7 +7,7 @@ const browser = await chromium.launch();
 async function render(size: number, padding: number, out: string) {
   const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
   const inner = size - padding * 2;
-  await page.setContent(`<body style="margin:0;background:${padding ? '#2856CF' : 'transparent'}"><div style="padding:${padding}px;width:${inner}px;height:${inner}px">${svg.replace('<svg ', `<svg width="${inner}" height="${inner}" `)}</div></body>`);
+  await page.setContent(`<body style="margin:0;background:${padding ? '#344413' : 'transparent'}"><div style="padding:${padding}px;width:${inner}px;height:${inner}px">${svg.replace('<svg ', `<svg width="${inner}" height="${inner}" `)}</div></body>`);
   const buf = await page.screenshot({ omitBackground: padding === 0, type: 'png' });
   writeFileSync(out, buf);
   await page.close();

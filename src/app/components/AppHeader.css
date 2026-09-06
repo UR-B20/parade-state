@@ -41,8 +41,33 @@
   gap: 8px;
   font-size: var(--fs-small);
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--text);
   letter-spacing: 0.1px;
+  min-width: 0;
+}
+
+.app-header__wordmark {
+  font-size: 15px;
+  letter-spacing: -0.1px;
+}
+
+.app-header__wordmark b {
+  font-weight: 700;
+  color: var(--brand-orange-ink);
+}
+
+.app-header__tagline {
+  display: none;
+  font-weight: 500;
+  color: var(--text-3);
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+@media (min-width: 900px) {
+  .app-header__tagline {
+    display: inline;
+  }
 }
 
 .app-header__actions {

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Parade State: battalion attendance reporting for unit commanders and S1.",
+  "description": "SoldierTrack: parade state and personnel tracking for unit commanders and S1.",
   "scripts": {
     "dev": "vite",
     "dev:mock": "VITE_MOCK_API=1 vite",

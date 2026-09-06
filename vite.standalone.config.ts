@@ -4,6 +4,7 @@
  */
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
@@ -32,7 +33,7 @@ function inlineEverything(): Plugin {
       }
       source = source.replace(/<link rel="(manifest|icon|apple-touch-icon|preload)"[^>]*>\s*/g, '');
       // Emit a body fragment (title, styles, root, script) so a host page can wrap it.
-      const title = /<title>[^<]*<\/title>/.exec(source)?.[0] ?? '<title>Parade State</title>';
+      const title = /<title>[^<]*<\/title>/.exec(source)?.[0] ?? '<title>SoldierTrack</title>';
       const styles = [...source.matchAll(/<style>[\s\S]*?<\/style>/g)].map((m) => m[0]).join('\n');
       const scripts = [...source.matchAll(/<script type="module">[\s\S]*?<\/script>/g)].map((m) => m[0]).join('\n');
       html.source = `${title}\n${styles}\n<div id="root"></div>\n${scripts}\n`;
@@ -41,7 +42,7 @@ function inlineEverything(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), inlineEverything()],
+  plugins: [react(), tailwindcss(), inlineEverything()],
   define: { 'import.meta.env.VITE_MOCK_API': '"1"', 'import.meta.env.VITE_HASH_ROUTER': '"1"' },
   resolve: { alias: { '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)) } },
   build: {

@@ -20,7 +20,8 @@ export function AppHeader({ title, meta, actions, children, wide }: AppHeaderPro
         <div className="app-header__brand-row">
           <span className="app-header__brand">
             <BrandMark />
-            Parade State
+            <span className="app-header__wordmark">Soldier<b>Track</b></span>
+            <span className="app-header__tagline">Personnel Tracking System</span>
           </span>
           {actions && <div className="app-header__actions">{actions}</div>}
         </div>

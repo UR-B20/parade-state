@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
  * Runs against the mock API (pnpm dev:mock) unless E2E_BASE_URL points at a real deployment
  * with the demo battalion seeded.
  */
-test.describe('Parade State', () => {
+test.describe('SoldierTrack', () => {
   test('commander marks, submits and resubmits', async ({ page }) => {
     await page.goto('/login');
     await page.getByRole('button', { name: 'Sign in as Coy 1 commander' }).click();

@@ -4,6 +4,11 @@
 
   /* Surfaces and ink */
   --surface: #ffffff;
+  /* SoldierTrack brand: olive roundel, orange accent (ink variant passes AA on white), dark hero ground. */
+  --brand-olive: #344413;
+  --brand-orange: #ff9a04;
+  --brand-orange-ink: #b06300;
+  --brand-ink: #101a14;
   --page: #f3f5f8;
   --surface-2: #f7f9fb;
   --text: #172b43;

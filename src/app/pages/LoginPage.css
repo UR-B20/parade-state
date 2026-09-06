@@ -8,23 +8,45 @@
   gap: 20px;
 }
 
-.login__card {
+.login__panel {
   width: 100%;
   max-width: 400px;
-  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 28px var(--pad-x) 24px;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.login__card {
+  width: 100%;
+  background: var(--surface);
+  padding: 24px var(--pad-x) 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+@media (min-width: 900px) {
+  .login__panel {
+    max-width: 880px;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    min-height: 520px;
+  }
+
+  .login__card {
+    padding: 40px 36px;
+    justify-content: center;
+  }
 }
 
 .login__brand {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 6px;
 }
 
 .login__title {

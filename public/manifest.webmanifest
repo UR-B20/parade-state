@@ -1,7 +1,7 @@
 {
-  "name": "Parade State",
-  "short_name": "Parade State",
-  "description": "Battalion attendance reporting",
+  "name": "SoldierTrack",
+  "short_name": "SoldierTrack",
+  "description": "Personnel tracking and parade state reporting for a battalion",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

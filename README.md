@@ -1,6 +1,6 @@
-# Parade State
+# SoldierTrack
 
-Mobile-first attendance reporting for a battalion. Unit commanders mark their personnel for the
+Mobile-first parade state reporting for a battalion. Because every soldier counts. Unit commanders mark their personnel for the
 AM parade, PM parade or an ad hoc event and submit to S1. S1 watches present strength and unit
 submissions across the battalion, sees who is absent and why, and exports to Excel or CSV.
 
@@ -79,7 +79,7 @@ pnpm seed:demo         # optional: load the fictional battalion (password demo12
 
 ### 3. First sign-in
 
-Open the Worker URL. With no accounts yet, the app shows **Set up Parade State**: enter your
+Open the Worker URL. With no accounts yet, the app shows **Set up SoldierTrack**: enter your
 name, email, a password and the setup key (`BOOTSTRAP_ADMIN_PASSWORD`). That creates the S1
 admin. From the account menu, **Manage accounts** creates unit commanders with a temporary
 password they must change on first sign-in.

@@ -33,7 +33,7 @@ export function absenteesCsv(abs: AbsenteesDto): string {
 }
 
 export function paradeStateXlsx(summary: BattalionSummaryDto, abs: AbsenteesDto, generatedAt: Date): Uint8Array {
-  const title = `Parade State · ${summary.event.label} · ${formatSgDateLong(summary.event.date)}`;
+  const title = `SoldierTrack parade state · ${summary.event.label} · ${formatSgDateLong(summary.event.date)}`;
   const generated = `Generated ${formatSgDateLong(generatedAt.toISOString().slice(0, 10))} ${formatSgTime(generatedAt)} · ${summary.unitsSubmitted} of ${summary.unitsTotal} units submitted`;
   const header = ['Unit', 'Strength', 'Present', 'MC', 'LL', 'MA', 'RSI', 'Others', 'Unmarked', 'Status', 'Submitted at'];
   const units = [...summary.units].sort((a, b) => a.unit.sortOrder - b.unit.sortOrder);

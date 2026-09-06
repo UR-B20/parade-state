@@ -133,7 +133,7 @@ export function App() {
     return (
       <div className="page">
         <div className="page__content" style={{ justifyContent: 'center' }}>
-          <EmptyState icon="offline" title="Couldn't reach Parade State" text={error} action={<Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>} />
+          <EmptyState icon="offline" title="Couldn't reach SoldierTrack" text={error} action={<Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>Try again</Button>} />
         </div>
       </div>
     );

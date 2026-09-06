@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { useSignIn } from '../api/mutations';
@@ -8,7 +8,7 @@ import { useApi } from '../api/provider';
 import { useQueryClient } from '@tanstack/react-query';
 import * as v from 'valibot';
 import { BootstrapSchema, firstIssue } from '@shared/schemas';
-import { BrandMark } from '../components/BrandMark';
+import { BrandHero } from '../components/BrandHero';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
 import '../components/Dialog.css';
@@ -21,7 +21,19 @@ export function LoginPage() {
 }
 
 /** First run: create the S1 admin with the setup key from the deployment secrets. */
+function useWide(): boolean {
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 900px)');
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
+}
+
 function BootstrapPage() {
+  const wide = useWide();
   const api = useApi();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -58,13 +70,12 @@ function BootstrapPage() {
 
   return (
     <div className="login">
-      <div className="login__card">
+      <div className="login__panel">
+        <BrandHero variant={wide ? 'wide' : 'stacked'} photo="sleeve" />
+        <div className="login__card">
         <div className="login__brand">
-          <BrandMark size={32} />
-          <div>
-            <h1 className="login__title">Set up Parade State</h1>
-            <p className="login__sub">Create the first S1 admin account. You can add commanders afterwards.</p>
-          </div>
+          <h1 className="login__title">Set up SoldierTrack</h1>
+          <p className="login__sub">Create the first S1 admin account. You can add commanders afterwards.</p>
         </div>
         <form className="login__form" onSubmit={submit} noValidate>
           {field('displayName', 'Your name and rank')}
@@ -74,12 +85,14 @@ function BootstrapPage() {
           {error && <div className="login__error" role="alert"><Icon name="alert" size={18} /><span>{error}</span></div>}
           <Button type="submit" variant="primary" block busy={busy}>Create admin account</Button>
         </form>
+        </div>
       </div>
     </div>
   );
 }
 
 function SignInPage() {
+  const wide = useWide();
   const meQ = useMe();
   const demoQ = useDemoAccounts();
   const signIn = useSignIn();
@@ -119,13 +132,12 @@ function SignInPage() {
 
   return (
     <div className="login">
-      <div className="login__card">
+      <div className="login__panel">
+        <BrandHero variant={wide ? 'wide' : 'stacked'} />
+        <div className="login__card">
         <div className="login__brand">
-          <BrandMark size={32} />
-          <div>
-            <h1 className="login__title">Parade State</h1>
-            <p className="login__sub">Battalion attendance reporting</p>
-          </div>
+          <h1 className="login__title">Sign in</h1>
+          <p className="login__sub">Parade state reporting for commanders and S1. Because every soldier counts.</p>
         </div>
         <form className="login__form" onSubmit={submit} noValidate>
           <label className="field">
@@ -166,6 +178,7 @@ function SignInPage() {
           </Button>
           <p className="dialog__muted" style={{ textAlign: 'center' }}>Forgot your password? Ask S1 to reset it.</p>
         </form>
+        </div>
       </div>
 
       {demoQ.data && demoQ.data.length > 0 && (
