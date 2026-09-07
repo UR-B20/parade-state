@@ -51,7 +51,7 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 - Brand: SoldierTrack. Assets in `src/app/brand/`. The olive roundel badge works on white and
   is the header mark, favicon and PWA icons (regenerate with `npx tsx scripts/icons.ts`). The
   horizontal lockups have white type and are only ever placed on a dark ground: the login
-  scene (`LoginPage.tsx`: full-bleed camo sleeve photo, dark band with the lockup, card beside
+  scene (`LoginPage.tsx`: full-bleed camo sleeve photo, dark band with the large round badge stacked above the wordmark cropped from the lockup (`soldiertrack-wordmark.svg`), card beside
   it with an uppercase LOGIN title, per the owner's mock). Wordmark "Soldier" in ink + "Track" in `--brand-orange-ink`.
 - Charts (`src/app/charts/theme.ts`): Inter, hairline gridlines, white tooltips with a 1px
   line border, thin marks, 2px surface gaps between stacked segments, direct labels drawn in
