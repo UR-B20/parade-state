@@ -19,7 +19,7 @@ export function AppHeader({ title, meta, actions, children, wide }: AppHeaderPro
       <div className={`app-header__inner${wide ? ' app-header__inner--wide' : ''}`}>
         <div className="app-header__brand-row">
           <span className="app-header__brand">
-            <BrandMark />
+            <BrandMark size={28} />
             <span className="app-header__wordmark">Soldier<b>Track</b></span>
             <span className="app-header__tagline">Personnel Tracking System</span>
           </span>
