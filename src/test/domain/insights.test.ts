@@ -7,7 +7,7 @@ const counts = (strength: number, present: number, o: Partial<UnitCounts> = {}):
   c.absent = c.ll + c.off + c.rsi + c.rso + c.mc + c.ma + c.hl + c.ol + c.others;
   return c;
 };
-const event: EventDto = { id: '2026-09-06-AM', date: '2026-09-06', type: 'AM', name: null, cutoffAt: '2026-09-06T02:00:00.000Z', label: 'AM parade' };
+const event: EventDto = { id: '2026-09-06-AM', date: '2026-09-06', type: 'AM', name: null, cutoffAt: '2026-09-06T02:00:00.000Z', label: 'AM parade', archivedAt: null };
 const units = [{ id: 'A', name: 'Alpha', sortOrder: 1 }, { id: 'B', name: 'Bravo', sortOrder: 2 }];
 const unit = (id: string, name: string): UnitSummaryRow['unit'] => ({ id: id as never, name, sortOrder: 1, platoons: [] });
 

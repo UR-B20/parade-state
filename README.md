@@ -29,7 +29,9 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
 - Saving is automatic. Submitting snapshots the unit's attendance as a version; further changes
   show as "changes since submission" until the unit **resubmits**.
 - **Ad hoc events** created by S1 are pre-filled from each unit's last submitted parade state
-  on or before that date. AM and PM parades start unmarked.
+  on or before that date. AM and PM parades start unmarked. Once an ad hoc event is over, S1
+  can **archive** it from the dashboard: it disappears from every event picker but keeps its
+  submissions, and can be restored under Cut-offs and unlocks.
 - The **Roll Call** exists for every date without anyone creating it. It has no cut-off, is
   never Late and is optional. The first time a unit opens it, it is pre-filled from that
   unit's last submitted parade (the PM parade if submitted, else the AM parade, else the last

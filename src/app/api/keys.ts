@@ -4,6 +4,7 @@ export const keys = {
   me: ['me'] as const,
   units: ['units'] as const,
   events: (date: IsoDate) => ['events', date] as const,
+  archivedEvents: ['events', 'archived'] as const,
   personnel: (unitId: string, includeInactive: boolean) => ['personnel', unitId, includeInactive] as const,
   attendance: (unitId: string, eventId: string) => ['attendance', unitId, eventId] as const,
   submissions: (unitId: string, eventId: string) => ['submissions', unitId, eventId] as const,

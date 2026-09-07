@@ -92,13 +92,16 @@ export class MockApi implements ApiClient {
 
   private eventById(eventId: string): EventDto {
     const adhoc = this.adhoc.find((e) => e.id === eventId);
-    if (adhoc) return adhoc;
+    if (adhoc) {
+      if (adhoc.archivedAt && this.currentEmail && this.currentUser().role !== 'ADMIN') throw new ApiError('NOT_FOUND', 'Event not found', 404);
+      return adhoc;
+    }
     const m = /^(\d{4}-\d{2}-\d{2})-(AM|PM|RC)$/.exec(eventId);
     if (!m) throw new ApiError('NOT_FOUND', 'Event not found', 404);
     const date = m[1]!;
-    if (m[2] === 'RC') return { id: eventId, date, type: 'ROLLCALL', name: null, cutoffAt: null, label: this.eventLabel('ROLLCALL', null) };
+    if (m[2] === 'RC') return { id: eventId, date, type: 'ROLLCALL', name: null, cutoffAt: null, label: this.eventLabel('ROLLCALL', null), archivedAt: null };
     const type = m[2] as 'AM' | 'PM';
-    return { id: eventId, date, type, name: null, cutoffAt: sgLocalToIso(date, type === 'AM' ? this.cutoffs.am : this.cutoffs.pm), label: this.eventLabel(type, null) };
+    return { id: eventId, date, type, name: null, cutoffAt: sgLocalToIso(date, type === 'AM' ? this.cutoffs.am : this.cutoffs.pm), label: this.eventLabel(type, null), archivedAt: null };
   }
 
   /** Personnel who can take a copied Present mark: on strength and not covered by an absence for the event. */
@@ -257,13 +260,13 @@ export class MockApi implements ApiClient {
       this.eventById(`${date}-AM`),
       this.eventById(`${date}-PM`),
       this.eventById(`${date}-RC`),
-      ...this.adhoc.filter((e) => e.date === date),
+      ...this.adhoc.filter((e) => e.date === date && !e.archivedAt),
     ]);
   }
 
   createAdhocEvent(body: CreateAdhocBody): Promise<EventDto> {
     return this.wait(() => {
-      const ev: MockAdhoc = { id: `${body.date}-X-${this.newId('ev')}`, date: body.date, type: 'ADHOC', name: body.name, cutoffAt: sgLocalToIso(body.date, body.cutoffTime), label: body.name };
+      const ev: MockAdhoc = { id: `${body.date}-X-${this.newId('ev')}`, date: body.date, type: 'ADHOC', name: body.name, cutoffAt: sgLocalToIso(body.date, body.cutoffTime), label: body.name, archivedAt: null };
       this.adhoc.push(ev);
       // Pre-fill from each unit's last submitted parade state on or before this date.
       const user = this.currentUser();
@@ -281,6 +284,25 @@ export class MockApi implements ApiClient {
       }
       return ev;
     });
+  }
+
+  archivedEvents(): Promise<EventDto[]> {
+    return this.wait(() => this.adhoc.filter((e) => e.archivedAt).sort((a, b) => (a.date < b.date ? 1 : -1)).map((e) => ({ ...e })));
+  }
+
+  private setArchived(eventId: string, archived: boolean): EventDto {
+    const ev = this.adhoc.find((e) => e.id === eventId);
+    if (!ev) throw new ApiError(archived ? 'VALIDATION' : 'NOT_FOUND', archived ? 'Only ad hoc events can be archived' : 'Event not found', archived ? 400 : 404);
+    ev.archivedAt = archived ? this.nowIso() : null;
+    return { ...ev };
+  }
+
+  archiveEvent(eventId: string): Promise<EventDto> {
+    return this.wait(() => this.setArchived(eventId, true));
+  }
+
+  restoreEvent(eventId: string): Promise<EventDto> {
+    return this.wait(() => this.setArchived(eventId, false));
   }
 
   // ---- roll ----
@@ -444,7 +466,7 @@ export class MockApi implements ApiClient {
       const sub = await this.submissionFor(unit.id, event, hash);
       rows.push({ unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) });
     }
-    this.ensureLateNotifications(event);
+    if (!event.archivedAt) this.ensureLateNotifications(event);
     rows.sort((a, b) => awaitingRank(a.submission) - awaitingRank(b.submission) || a.unit.sortOrder - b.unit.sortOrder);
     const submitted = rows.filter((r) => r.submission.kind === 'SUBMITTED' || r.submission.kind === 'RESUBMITTED').length;
     return { event, totals: sumCounts(rows.map((r) => r.counts)), unitsSubmitted: submitted, unitsTotal: rows.length, units: rows, serverNow: this.nowIso() };

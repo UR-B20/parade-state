@@ -46,6 +46,27 @@ describe('events', () => {
     const list = await h.json<EventDto[]>('/events?date=2026-09-06', { as: admin });
     expect(list.body).toHaveLength(4);
   });
+
+  it('lets S1 archive an ad hoc event, hiding it from commanders until it is restored', async () => {
+    const created = await h.json<EventDto>('/events', { method: 'POST', as: admin, json: { date: '2026-09-06', name: 'Range', cutoffTime: '15:00' } });
+    const id = created.body.id;
+    expect((await h.request(`/events/${id}/archive`, { method: 'POST', as: cdr1 })).status).toBe(403);
+    expect((await h.request(`/events/${AM}/archive`, { method: 'POST', as: admin })).status).toBe(400);
+    const archived = await h.json<EventDto>(`/events/${id}/archive`, { method: 'POST', as: admin });
+    expect(archived.status).toBe(200);
+    expect(archived.body.archivedAt).toBe(h.clock.now.toISOString());
+    expect((await h.json<EventDto[]>('/events?date=2026-09-06', { as: cdr1 })).body.map((e) => e.id)).not.toContain(id);
+    expect((await h.request(`/units/COY1/attendance/${id}`, { as: cdr1 })).status).toBe(404);
+    expect((await h.request(`/units/COY1/submissions/${id}`, { method: 'POST', as: cdr1 })).status).toBe(404);
+    expect((await h.request(`/units/COY1/attendance/${id}`, { as: admin })).status).toBe(200);
+    const list = await h.json<EventDto[]>('/events/archived', { as: admin });
+    expect(list.body.map((e) => e.id)).toEqual([id]);
+    expect((await h.request('/events/archived', { as: cdr1 })).status).toBe(403);
+    const restored = await h.json<EventDto>(`/events/${id}/archive`, { method: 'DELETE', as: admin });
+    expect(restored.body.archivedAt).toBeNull();
+    expect((await h.json<EventDto[]>('/events?date=2026-09-06', { as: cdr1 })).body.map((e) => e.id)).toContain(id);
+    expect((await h.json<EventDto[]>('/events/archived', { as: admin })).body).toHaveLength(0);
+  });
 });
 
 describe('roll', () => {

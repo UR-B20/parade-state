@@ -5,7 +5,7 @@ import type { UnitSummaryRow } from '../src/shared/types';
 
 const d = await buildDemoDataset();
 const event = d.events.find((e) => e.id === `${d.date}-AM`)!;
-const eventDto = { ...event, name: null, label: 'AM parade' } as const;
+const eventDto = { ...event, name: null, label: 'AM parade', archivedAt: null } as const;
 const rows: UnitSummaryRow[] = d.units.map((u) => {
   const people = d.personnel.filter((p) => p.unitId === u.id);
   const spans = d.spans.filter((s) => s.unitId === u.id);

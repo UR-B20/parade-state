@@ -5,7 +5,7 @@ import { formatSgDateLong, formatSgTime, isIsoDate, sgDateOf } from '@shared/dat
 import { ApiError } from '../../api/client';
 import { keys } from '../../api/keys';
 import { useApi } from '../../api/provider';
-import { useSettings, useUnits } from '../../api/queries';
+import { useArchivedEvents, useSettings, useUnits } from '../../api/queries';
 import { useAuth } from '../../state/auth';
 import { AccountButton, AccountMenu } from '../../components/AccountMenu';
 import { AppHeader } from '../../components/AppHeader';
@@ -23,6 +23,7 @@ export function SettingsPage() {
   const toast = useToast();
   const settingsQ = useSettings(true);
   const unitsQ = useUnits();
+  const archivedQ = useArchivedEvents(true);
   const [newPlatoon, setNewPlatoon] = useState<Record<string, string>>({});
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [am, setAm] = useState<string | null>(null);
@@ -44,6 +45,7 @@ export function SettingsPage() {
   });
   const unlock = useMutation({ mutationFn: (d: string) => api.unlockDate(d), onSuccess: (_s, d) => { done(); toast.show(`${formatSgDateLong(d)} unlocked for 24 hours`); setUnlockDate(''); }, onError });
   const relock = useMutation({ mutationFn: (d: string) => api.relockDate(d), onSuccess: () => { done(); toast.show('Date locked again'); }, onError });
+  const restore = useMutation({ mutationFn: (id: string) => api.restoreEvent(id), onSuccess: (ev) => { void qc.invalidateQueries({ queryKey: ['events'] }); toast.show(`${ev.label} restored`); }, onError });
 
   const s = settingsQ.data;
   const cutoffsDirty = (am !== null && am !== s?.cutoffAm) || (pm !== null && pm !== s?.cutoffPm);
@@ -130,6 +132,28 @@ export function SettingsPage() {
                         <span className="absentee__meta num">Unlocked until {formatSgTime(u.expiresAt)}{sgDateOf(u.expiresAt) !== today ? ` tomorrow` : ''}</span>
                       </div>
                       <Button small onClick={() => relock.mutate(u.date)} busy={relock.isPending && relock.variables === u.date}>Lock</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="roll" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} aria-labelledby="archived-title">
+              <h2 id="archived-title" className="dialog__title" style={{ fontSize: 'var(--fs-body-lg)' }}>Archived ad hoc events</h2>
+              <p className="dialog__muted">Archive an ad hoc event from the battalion dashboard once it is over. Archived events are hidden from everyone but keep their submissions; restore one to bring it back.</p>
+              {archivedQ.isPending ? (
+                <SkeletonRows rows={2} />
+              ) : (archivedQ.data ?? []).length === 0 ? (
+                <p className="dialog__muted">No archived events.</p>
+              ) : (
+                <ul className="roll">
+                  {archivedQ.data!.map((ev) => (
+                    <li key={ev.id} className="absentee">
+                      <div className="absentee__main">
+                        <span className="absentee__name">{ev.label}</span>
+                        <span className="absentee__meta num">{formatSgDateLong(ev.date)}{ev.archivedAt ? ` · archived ${formatSgDateLong(sgDateOf(ev.archivedAt))}` : ''}</span>
+                      </div>
+                      <Button small onClick={() => restore.mutate(ev.id)} busy={restore.isPending && restore.variables === ev.id}>Restore</Button>
                     </li>
                   ))}
                 </ul>

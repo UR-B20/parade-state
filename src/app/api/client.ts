@@ -30,6 +30,10 @@ export interface ApiClient {
   units(): Promise<UnitDto[]>;
   events(date: IsoDate): Promise<EventDto[]>;
   createAdhocEvent(body: CreateAdhocBody): Promise<EventDto>;
+  /** S1 only: archived ad hoc events, newest first. */
+  archivedEvents(): Promise<EventDto[]>;
+  archiveEvent(eventId: string): Promise<EventDto>;
+  restoreEvent(eventId: string): Promise<EventDto>;
 
   personnel(unitId: string, includeInactive?: boolean): Promise<PersonDto[]>;
   createPerson(unitId: string, body: CreatePersonBody): Promise<PersonDto>;

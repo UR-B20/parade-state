@@ -23,6 +23,11 @@ export function useEvents(date: IsoDate) {
   return useQuery({ queryKey: keys.events(date), queryFn: () => api.events(date), staleTime: 60_000 });
 }
 
+export function useArchivedEvents(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: keys.archivedEvents, queryFn: () => api.archivedEvents(), enabled });
+}
+
 export function useUnitAttendance(unitId: string | null, eventId: string | null) {
   const api = useApi();
   return useQuery({

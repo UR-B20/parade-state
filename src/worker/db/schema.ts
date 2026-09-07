@@ -77,6 +77,9 @@ export const events = pgTable('events', {
   unitId: text('unit_id').references(() => units.id),
   createdBy: uuid('created_by'),
   createdAt: createdAt(),
+  /** S1 can archive an ad hoc event: it leaves every picker but keeps its submissions. */
+  archivedAt: tz('archived_at'),
+  archivedBy: uuid('archived_by'),
 }, (t) => [
   index('events_date_idx').on(t.date),
   uniqueIndex('events_standard_unique').on(t.date, t.type).where(sql`${t.type} <> 'ADHOC'`),

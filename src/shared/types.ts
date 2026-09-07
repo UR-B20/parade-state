@@ -64,6 +64,8 @@ export interface EventDto {
   cutoffAt: IsoTimestamp | null;
   /** 'AM parade', 'PM parade', 'Roll call' or the ad hoc name. */
   label: string;
+  /** Set when S1 archived this ad hoc event; archived events are not listed for anyone. */
+  archivedAt: IsoTimestamp | null;
 }
 
 export interface PersonDto {

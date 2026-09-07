@@ -3,7 +3,7 @@ import { isIsoDate, sgDateOf } from '@shared/dates';
 import { CreateAdhocEventSchema } from '@shared/schemas';
 import { requireAdmin, requireAuth, type AppEnv } from '../auth/middleware';
 import { validation } from '../errors';
-import { createAdhocEvent, listEvents } from '../services/events';
+import { createAdhocEvent, listArchivedEvents, listEvents, setAdhocArchived } from '../services/events';
 import { getSettings, resolveNow } from '../services/settings';
 import { body } from '../validate';
 import { listUnits } from '../services/platoons';
@@ -24,6 +24,16 @@ eventRoutes.post('/', requireAdmin, body(CreateAdhocEventSchema), async (c) => {
   const input = c.req.valid('json');
   await getSettings(db);
   return c.json(await createAdhocEvent(db, input, c.get('user').id, c.get('realNow')), 201);
+});
+
+eventRoutes.get('/archived', requireAdmin, async (c) => c.json(await listArchivedEvents(c.get('db'))));
+
+eventRoutes.post('/:eventId/archive', requireAdmin, async (c) => {
+  return c.json(await setAdhocArchived(c.get('db'), c.req.param('eventId'), true, c.get('user').id, c.get('realNow')));
+});
+
+eventRoutes.delete('/:eventId/archive', requireAdmin, async (c) => {
+  return c.json(await setAdhocArchived(c.get('db'), c.req.param('eventId'), false, c.get('user').id, c.get('realNow')));
 });
 
 export const unitRoutes = new Hono<AppEnv>();

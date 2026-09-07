@@ -50,6 +50,13 @@
       "when": 1788820000000,
       "tag": "0006_reasons_roll_call",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788830000000,
+      "tag": "0007_archive_adhoc_events",
+      "breakpoints": true
     }
   ]
 }

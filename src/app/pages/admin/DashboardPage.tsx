@@ -17,7 +17,9 @@ import { AccountButton, AccountMenu } from '../../components/AccountMenu';
 import { AppHeader } from '../../components/AppHeader';
 import { Button } from '../../components/Button';
 import { ComparisonTable } from '../../components/ComparisonTable';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ConnectionBanner } from '../../components/ConnectionBanner';
+import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/EmptyState';
 import { EventPicker } from '../../components/EventPicker';
 import { ExportMenu } from '../../components/ExportMenu';
@@ -81,8 +83,20 @@ export function DashboardPage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [adhocOpen, setAdhocOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const api = useApi();
   const qc = useQueryClient();
+  const toast = useToast();
+  const archive = useMutation({
+    mutationFn: (id: string) => api.archiveEvent(id),
+    onSuccess: (ev) => {
+      setArchiveOpen(false);
+      void qc.invalidateQueries({ queryKey: ['events'] });
+      toast.show(`${ev.label} archived. Restore it under Cut-offs and unlocks.`);
+      setParam('event', null);
+    },
+    onError: (err) => toast.show(err instanceof ApiError ? err.message : "Couldn't archive the event.", { tone: 'error' }),
+  });
 
   // Live refresh: Supabase Realtime tells us when any unit submits or marks.
   useEffect(() => {
@@ -126,6 +140,13 @@ export function DashboardPage() {
           onDateChange={(d) => setParams((p) => { const next = new URLSearchParams(p); next.set('date', d); next.delete('event'); return next; })}
           onCreateAdhoc={() => setAdhocOpen(true)}
         />
+        {event?.type === 'ADHOC' && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <Button small variant="ghost" onClick={() => setArchiveOpen(true)}>
+              <Icon name="archive" size={16} /> Archive this event
+            </Button>
+          </div>
+        )}
       </AppHeader>
       <ConnectionBanner />
 
@@ -229,6 +250,17 @@ export function DashboardPage() {
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} data={notifQ.data} today={today} />
       <AccountMenu open={accountOpen} onClose={() => setAccountOpen(false)} />
       <AdhocSheet open={adhocOpen} date={date} onClose={() => setAdhocOpen(false)} onCreated={(id) => { setAdhocOpen(false); setParam('event', id); }} />
+      <ConfirmDialog
+        open={archiveOpen}
+        title={`Archive ${event?.label ?? 'this event'}?`}
+        confirmLabel="Archive event"
+        danger
+        busy={archive.isPending}
+        onConfirm={() => event && archive.mutate(event.id)}
+        onCancel={() => setArchiveOpen(false)}
+      >
+        <p className="dialog__text">Commanders will no longer see it and cannot mark or submit for it. Its submissions are kept. You can restore it under Cut-offs and unlocks.</p>
+      </ConfirmDialog>
     </div>
   );
 }

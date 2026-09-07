@@ -96,6 +96,9 @@ export class HttpApi implements ApiClient {
   units() { return this.call<UnitDto[]>('/units'); }
   events(date: IsoDate) { return this.call<EventDto[]>(`/events?date=${date}`); }
   createAdhocEvent(body: CreateAdhocBody) { return this.call<EventDto>('/events', { method: 'POST', json: body }); }
+  archivedEvents() { return this.call<EventDto[]>('/events/archived'); }
+  archiveEvent(eventId: string) { return this.call<EventDto>(`/events/${eventId}/archive`, { method: 'POST' }); }
+  restoreEvent(eventId: string) { return this.call<EventDto>(`/events/${eventId}/archive`, { method: 'DELETE' }); }
 
   personnel(unitId: string, includeInactive = false) { return this.call<PersonDto[]>(`/units/${unitId}/personnel${includeInactive ? '?includeInactive=1' : ''}`); }
   createPerson(unitId: string, body: CreatePersonBody) { return this.call<PersonDto>(`/units/${unitId}/personnel`, { method: 'POST', json: body }); }

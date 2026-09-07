@@ -86,7 +86,10 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   pre-filled at creation, from each unit's last submitted parade state on or before the event
   date. The Roll Call is pre-filled per unit the first time it is opened (`prefillRollCallForUnit`:
   PM parade if submitted, else AM, else the last parade before that day). AM/PM start unmarked.
-  Roll Call submissions notify S1 like the others.
+  Roll Call submissions notify S1 like the others. S1 can archive an ad hoc event
+  (`events.archived_at`, migration 0007; `POST/DELETE /events/:id/archive`, `GET /events/archived`):
+  archived events are listed for nobody, commanders get 404 on them, S1 can still open them,
+  and they never turn Late. Restore lives on the Cut-offs and unlocks page.
 - Submissions are versioned with a content hash (UNMARKED lines included); later changes show
   as "changes since submission" until the unit resubmits. States: NOT_MARKED, PENDING, LATE,
   SUBMITTED, RESUBMITTED. Late = not submitted at cut-off (cron 10:05 and 14:05 SGT).
