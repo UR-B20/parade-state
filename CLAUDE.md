@@ -14,8 +14,9 @@ role is labelled "S1 Branch admin" everywhere. S1 Branch watches present strengt
 manages accounts, cut-offs, platoons and past-date unlocks, and reads an executive overview.
 
 - Owner: Ranee (GitHub `UR-B20`). Repo `UR-B20/parade-state`. Work branch
-  `claude/parade-state-attendance-design-d9sliy`, draft PR #1 against `main` (`main` holds
-  only the scaffold commit). Push to that branch only.
+  `claude/parade-state-attendance-design-d9sliy`; PR #1 from it was merged on 6 Sep and
+  `main` now tracks the branch (push `HEAD:main` to deploy). Push to that branch and `main`
+  only; no open PR exists because the two are identical.
 - Review build (single-file mock build) published as a Claude artifact:
   https://claude.ai/code/artifact/66d1822c-2a40-4c78-8a77-13e911429c96 — republish with
   `pnpm build:standalone` and the Artifact tool using that URL.
@@ -126,7 +127,7 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 - Never print secret values. Check presence with
   `env | grep -E '^SUPABASE_|^BOOTSTRAP' | sed 's/=.*/=<set>/'`.
 - Commit messages carry the session's attribution trailers; no model identifiers in commits,
-  PR text or code. Keep the PR #1 description current when features land.
+  PR text or code.
 - The user prefers plans first for large changes and to be asked before scope changes; they
   are not a developer, so explain setup steps concretely (menus, buttons, which value goes
   where) and keep secrets out of chat.
