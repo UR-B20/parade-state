@@ -173,6 +173,10 @@
 .count-tile--MA { --tile-bg: var(--ma-tint); --tile-fg: var(--ma); }
 .count-tile--RSI { --tile-bg: var(--rsi-tint); --tile-fg: var(--rsi); }
 .count-tile--OTHERS { --tile-bg: var(--others-tint); --tile-fg: var(--others); }
+.count-tile--OFF { --tile-bg: var(--off-tint); --tile-fg: var(--off); }
+.count-tile--RSO { --tile-bg: var(--rso-tint); --tile-fg: var(--rso); }
+.count-tile--HL { --tile-bg: var(--hl-tint); --tile-fg: var(--hl); }
+.count-tile--OL { --tile-bg: var(--ol-tint); --tile-fg: var(--ol); }
 .count-tile--zero { --tile-bg: var(--surface); --tile-fg: var(--text-3); }
 
 .unit__links {
@@ -279,6 +283,10 @@
 .ctable .col-MA { color: var(--ma); }
 .ctable .col-RSI { color: var(--rsi); }
 .ctable .col-OTHERS { color: var(--others); }
+.ctable .col-OFF { color: var(--off); }
+.ctable .col-RSO { color: var(--rso); }
+.ctable .col-HL { color: var(--hl); }
+.ctable .col-OL { color: var(--ol); }
 .ctable .col-UNMARKED { color: var(--warn); font-weight: 600; }
 
 /* Export */

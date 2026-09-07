@@ -1,22 +1,12 @@
 import { Link } from 'react-router-dom';
 import { formatSgTime } from '@shared/dates';
 import { STATUS_LABEL, STATUSES } from '@shared/statuses';
-import type { BattalionSummaryDto, SubmissionState, UnitCounts } from '@shared/types';
+import { countFor } from '@shared/domain';
+import type { BattalionSummaryDto, SubmissionState } from '@shared/types';
 import { SubmissionChip } from './SubmissionChip';
 import './Admin.css';
 
 const COLS = STATUSES.map((s) => ({ key: s, label: STATUS_LABEL[s] }));
-
-function cell(counts: UnitCounts, key: (typeof STATUSES)[number]): number {
-  switch (key) {
-    case 'PRESENT': return counts.present;
-    case 'MC': return counts.mc;
-    case 'LL': return counts.ll;
-    case 'MA': return counts.ma;
-    case 'RSI': return counts.rsi;
-    case 'OTHERS': return counts.others;
-  }
-}
 
 function submittedAt(state: SubmissionState): string {
   return state.kind === 'SUBMITTED' || state.kind === 'RESUBMITTED' ? formatSgTime(state.submittedAt) : '—';
@@ -49,7 +39,7 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
               </td>
               <td>{r.counts.strength}</td>
               {COLS.map((c) => {
-                const n = cell(r.counts, c.key);
+                const n = countFor(r.counts, c.key);
                 return (
                   <td key={c.key} className={n === 0 ? 'zero' : `col-${c.key}`}>{n}</td>
                 );
@@ -65,7 +55,7 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
             <td className="ctable__text">15C4I Bn</td>
             <td>{summary.totals.strength}</td>
             {COLS.map((c) => (
-              <td key={c.key}>{cell(summary.totals, c.key)}</td>
+              <td key={c.key}>{countFor(summary.totals, c.key)}</td>
             ))}
             <td>{summary.totals.unmarked}</td>
             <td className="ctable__text">{summary.unitsSubmitted} of {summary.unitsTotal} submitted</td>

@@ -1,10 +1,10 @@
 import { addDays, type IsoDate, type IsoTimestamp } from '../dates';
-import { OTHERS_SUB_TYPES, type OthersSubType } from '../statuses';
+import { ALL_SUB_TYPES, type OthersSubType } from '../statuses';
 import type { EffectiveStatus, EventDto, TrendDay, TrendsDto, UnitCounts, UnitSummaryRow, UnitTimeliness } from '../types';
-import { sumCounts } from './counts';
+import { normalizeCounts, sumCounts } from './counts';
 
 export interface TrendSubmission { unitId: string; eventId: string; submittedAt: IsoTimestamp; counts: UnitCounts }
-export interface TrendEvent { id: string; date: IsoDate; cutoffAt: IsoTimestamp }
+export interface TrendEvent { id: string; date: IsoDate; cutoffAt: IsoTimestamp | null }
 
 export interface TrendsInput {
   event: EventDto;
@@ -58,13 +58,13 @@ export function buildTrends(input: TrendsInput): TrendsDto {
       const s = latest.get(`${u.id}|${ev.id}`);
       const t = timeliness.get(u.id)!;
       if (!s) { t.missed += 1; continue; }
-      counts.push(s.counts);
-      if (Date.parse(s.submittedAt) <= Date.parse(ev.cutoffAt)) { onTime += 1; t.onTime += 1; } else { late += 1; t.late += 1; }
+      counts.push(normalizeCounts(s.counts));
+      if (ev.cutoffAt === null || Date.parse(s.submittedAt) <= Date.parse(ev.cutoffAt)) { onTime += 1; t.onTime += 1; } else { late += 1; t.late += 1; }
     }
     return { date, eventId: ev.id, live: false, counts: sumCounts(counts), unitsSubmitted: counts.length, unitsTotal: units.length, onTime, late };
   });
 
-  const othersSubTypes = Object.fromEntries(OTHERS_SUB_TYPES.map((t) => [t, 0])) as Record<OthersSubType, number>;
+  const othersSubTypes = Object.fromEntries(ALL_SUB_TYPES.map((t) => [t, 0])) as Record<OthersSubType, number>;
   for (const s of input.todayStatuses) if (s.status === 'OTHERS' && s.subType) othersSubTypes[s.subType] += 1;
 
   return { event: input.event, days, units: [...timeliness.values()], othersSubTypes, serverNow: input.serverNow };

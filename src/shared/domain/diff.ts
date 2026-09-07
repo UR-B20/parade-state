@@ -5,6 +5,7 @@ function sameTuple(a: StatusTuple, b: StatusTuple): boolean {
   return (
     a.status === b.status &&
     (a.subType ?? null) === (b.subType ?? null) &&
+    (a.halfDay ?? null) === (b.halfDay ?? null) &&
     (a.startDate ?? null) === (b.startDate ?? null) &&
     (a.endDate ?? null) === (b.endDate ?? null) &&
     (a.remark ?? null) === (b.remark ?? null)

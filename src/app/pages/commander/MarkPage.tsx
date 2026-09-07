@@ -167,7 +167,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
     }
   };
 
-  const cutoff = event ? { time: formatSgTime(event.cutoffAt), passed: now.getTime() >= Date.parse(event.cutoffAt) } : undefined;
+  const cutoff = event?.cutoffAt ? { time: formatSgTime(event.cutoffAt), passed: now.getTime() >= Date.parse(event.cutoffAt) } : undefined;
   const reportPill = data ? <ReportPill state={data.submission} /> : null;
 
   if (!unitId) {

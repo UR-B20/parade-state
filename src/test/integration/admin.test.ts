@@ -43,8 +43,8 @@ describe('battalion summary on the demo battalion', () => {
   it('lists the 25 absentees grouped by status in fixed order with unit and dates', async () => {
     const { body } = await h.json<AbsenteesDto>(`/admin/absentees/${AM}`, { as: admin });
     expect(body.total).toBe(25);
-    expect(body.groups.map((g) => [g.status, g.items.length])).toEqual([['MC', 9], ['LL', 5], ['MA', 4], ['RSI', 3], ['OTHERS', 4]]);
-    const daniel = body.groups[0]!.items.find((i) => i.name === 'Daniel Tan')!;
+    expect(body.groups.map((g) => [g.status, g.items.length])).toEqual([['LL', 5], ['RSI', 3], ['MC', 9], ['MA', 4], ['OTHERS', 4]]);
+    const daniel = body.groups.find((g) => g.status === 'MC')!.items.find((i) => i.name === 'Daniel Tan')!;
     expect(daniel).toMatchObject({ rank: 'CPL', unitName: 'Coy 1', status: 'MC', startDate: '2026-09-05', endDate: '2026-09-08' });
     const ethan = body.groups.find((g) => g.status === 'OTHERS')!.items.find((i) => i.name === 'Ethan Goh')!;
     expect(ethan).toMatchObject({ subType: 'COURSE', endDate: '2026-09-11' });
@@ -77,7 +77,7 @@ describe('export', () => {
     const res = await h.request(`/admin/export/${AM}.csv`, { as: admin });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/csv');
-    expect(res.headers.get('content-disposition')).toBe('attachment; filename="parade-state-2026-09-06-AM.csv"');
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="parade-state-2026-09-06-am.csv"');
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // Response.text() would strip the BOM, so check bytes
     const text = new TextDecoder().decode(bytes);

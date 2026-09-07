@@ -19,6 +19,10 @@
 .pill--MA { --pill-bg: var(--ma-tint); --pill-fg: var(--ma); }
 .pill--RSI { --pill-bg: var(--rsi-tint); --pill-fg: var(--rsi); }
 .pill--OTHERS { --pill-bg: var(--others-tint); --pill-fg: var(--others); }
+.pill--OFF { --pill-bg: var(--off-tint); --pill-fg: var(--off); }
+.pill--RSO { --pill-bg: var(--rso-tint); --pill-fg: var(--rso); }
+.pill--HL { --pill-bg: var(--hl-tint); --pill-fg: var(--hl); }
+.pill--OL { --pill-bg: var(--ol-tint); --pill-fg: var(--ol); }
 
 /* Not yet marked: counts in neither present nor absent. */
 .pill--UNMARKED {

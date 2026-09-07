@@ -101,9 +101,9 @@ export function DashboardPage() {
     return { awaiting, submitted };
   }, [summary]);
 
-  const cutoff = event ? { time: formatSgTime(event.cutoffAt), passed: now.getTime() >= Date.parse(event.cutoffAt) } : undefined;
+  const cutoff = event?.cutoffAt ? { time: formatSgTime(event.cutoffAt), passed: now.getTime() >= Date.parse(event.cutoffAt) } : undefined;
   const query = `?date=${date}${eventId ? `&event=${eventId}` : ''}`;
-  const fileStem = event ? `parade-state-${event.date}-${event.type === 'ADHOC' ? 'adhoc' : event.type}` : 'parade-state';
+  const fileStem = event ? `parade-state-${event.date}-${event.type === 'ADHOC' ? 'adhoc' : event.type.toLowerCase()}` : 'parade-state';
 
   return (
     <div className="page">

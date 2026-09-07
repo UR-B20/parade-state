@@ -29,7 +29,7 @@ async function loadPast(db: Db, event: EventRow, days: number, unitId?: string):
     if (!cur || s.version > cur.version) latest.set(key, s);
   }
   return {
-    pastEvents: pastEvents.map((e) => ({ id: e.id, date: e.date, cutoffAt: e.cutoffAt.toISOString() })),
+    pastEvents: pastEvents.map((e) => ({ id: e.id, date: e.date, cutoffAt: e.cutoffAt?.toISOString() ?? null })),
     submissions: [...latest.values()].map((s) => ({ unitId: s.unitId, eventId: s.eventId, submittedAt: s.submittedAt.toISOString(), counts: s.counts })),
   };
 }

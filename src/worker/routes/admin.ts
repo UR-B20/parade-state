@@ -35,7 +35,7 @@ adminRoutes.get('/export/:file', async (c) => {
   const m = /^(.+)\.(xlsx|csv)$/.exec(c.req.param('file'));
   if (!m) throw notFound('Export');
   const event = await getEvent(db, m[1]!, await getSettings(db));
-  const stem = `parade-state-${event.date}-${event.type === 'ADHOC' ? 'adhoc' : event.type}`;
+  const stem = `parade-state-${event.date}-${event.type === 'ADHOC' ? 'adhoc' : event.type.toLowerCase()}`;
   const abs = await absentees(db, c.env, event, c.get('realNow'));
   if (m[2] === 'csv') {
     return c.body(absenteesCsv(abs), 200, {

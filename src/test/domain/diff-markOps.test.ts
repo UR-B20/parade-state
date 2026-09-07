@@ -3,7 +3,7 @@ import { diffAgainstSnapshot, MarkValidationError, planMark, toSnapshot, type Sp
 import type { EffectiveStatus } from '@shared/types';
 
 const es = (over: Partial<EffectiveStatus>): EffectiveStatus => ({
-  personId: 'p', rank: 'PTE', name: 'X', platoonId: null, status: 'PRESENT', subType: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
+  personId: 'p', rank: 'PTE', name: 'X', platoonId: null, status: 'PRESENT', subType: null, halfDay: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
 });
 
 describe('diffAgainstSnapshot', () => {
@@ -31,13 +31,13 @@ const other: SpanRow = { ...mc, id: 'other', personId: 'q' };
 describe('planMark', () => {
   it('PRESENT only confirms this event', () => {
     const plan = planMark({ action: 'PRESENT' }, 'p', [mc], '2026-09-06');
-    expect(plan).toEqual({ supersedeSpanIds: [], insertSpans: [], deleteMarksInRange: null, upsertPresentMark: true });
+    expect(plan).toEqual({ supersedeSpanIds: [], insertSpans: [], deleteMarksInRange: null, deleteMarksHalf: null, upsertPresentMark: true });
   });
 
   it('BACK_TO_PRESENT truncates the covering span to yesterday and drops future spans', () => {
     const plan = planMark({ action: 'BACK_TO_PRESENT' }, 'p', [mc, future, other], '2026-09-06');
     expect(plan.supersedeSpanIds.sort()).toEqual(['fut', 'mc']);
-    expect(plan.insertSpans).toEqual([{ personId: 'p', status: 'MC', subType: null, startDate: '2026-09-04', endDate: '2026-09-05', remark: 'fever', replacesId: 'mc' }]);
+    expect(plan.insertSpans).toEqual([{ personId: 'p', status: 'MC', subType: null, halfDay: null, startDate: '2026-09-04', endDate: '2026-09-05', remark: 'fever', replacesId: 'mc' }]);
     expect(plan.upsertPresentMark).toBe(true);
   });
 
@@ -55,6 +55,19 @@ describe('planMark', () => {
     expect(plan.insertSpans[1]).toMatchObject({ status: 'LL', startDate: '2026-09-06', endDate: '2026-09-09', replacesId: null });
     expect(plan.deleteMarksInRange).toEqual({ start: '2026-09-06', end: '2026-09-09' });
     expect(plan.upsertPresentMark).toBe(false);
+  });
+
+  it('SET RSO forces the span to the event day, like RSI', () => {
+    const plan = planMark({ action: 'SET', status: 'RSO', startDate: '2026-09-01', endDate: null }, 'p', [], '2026-09-06');
+    expect(plan.insertSpans[0]).toMatchObject({ status: 'RSO', startDate: '2026-09-06', endDate: '2026-09-06', halfDay: null });
+  });
+
+  it('SET half-day LL pins the span to the event day and only clears marks in that half', () => {
+    const plan = planMark({ action: 'SET', status: 'LL', halfDay: 'PM', startDate: '2026-09-01', endDate: '2026-09-09' }, 'p', [], '2026-09-06');
+    expect(plan.insertSpans).toEqual([{ personId: 'p', status: 'LL', subType: null, halfDay: 'PM', startDate: '2026-09-06', endDate: '2026-09-06', remark: null, replacesId: null }]);
+    expect(plan.deleteMarksInRange).toEqual({ start: '2026-09-06', end: '2026-09-06' });
+    expect(plan.deleteMarksHalf).toBe('PM');
+    expect(() => planMark({ action: 'SET', status: 'MC', halfDay: 'AM', startDate: '2026-09-06', endDate: null }, 'p', [], '2026-09-06')).toThrow(/Only LL and OFF/);
   });
 
   it('SET RSI forces the span to the event day', () => {

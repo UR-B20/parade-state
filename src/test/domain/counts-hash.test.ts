@@ -3,7 +3,7 @@ import { canonicalizeUnitState, contentHash, sumCounts, unitCounts } from '@shar
 import type { EffectiveStatus } from '@shared/types';
 
 const es = (over: Partial<EffectiveStatus>): EffectiveStatus => ({
-  personId: 'p', rank: 'PTE', name: 'X', platoonId: null, status: 'UNMARKED', subType: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
+  personId: 'p', rank: 'PTE', name: 'X', platoonId: null, status: 'UNMARKED', subType: null, halfDay: null, startDate: null, endDate: null, remark: null, spanId: null, ...over,
 });
 
 describe('unitCounts', () => {
@@ -15,7 +15,7 @@ describe('unitCounts', () => {
       es({ personId: '4', status: 'RSI' }),
       es({ personId: '5', status: 'OTHERS', subType: 'DUTY' }),
     ]);
-    expect(c).toEqual({ strength: 5, present: 1, unmarked: 1, mc: 1, ll: 0, ma: 0, rsi: 1, others: 1, absent: 3 });
+    expect(c).toEqual({ strength: 5, present: 1, unmarked: 1, ll: 0, off: 0, rsi: 1, rso: 0, mc: 1, ma: 0, hl: 0, ol: 0, others: 1, absent: 3 });
   });
 
   it('sums battalion totals', () => {

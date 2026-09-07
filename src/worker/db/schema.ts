@@ -6,9 +6,10 @@ import type { UnitCounts } from '@shared/types';
 import type { SnapshotEntry } from '@shared/domain/canonical';
 
 export const roleEnum = pgEnum('role', ['ADMIN', 'COMMANDER']);
-export const eventTypeEnum = pgEnum('event_type', ['AM', 'PM', 'ADHOC']);
-export const absenceStatusEnum = pgEnum('absence_status', ['MC', 'LL', 'MA', 'RSI', 'OTHERS']);
-export const othersSubTypeEnum = pgEnum('others_sub_type', ['ATTACHED_OUT', 'COURSE', 'OUTFIELD', 'DUTY']);
+// Enum values are listed in the order they were added (Postgres appends new values), not display order.
+export const eventTypeEnum = pgEnum('event_type', ['AM', 'PM', 'ADHOC', 'ROLLCALL']);
+export const absenceStatusEnum = pgEnum('absence_status', ['MC', 'LL', 'MA', 'RSI', 'OTHERS', 'OFF', 'RSO', 'HL', 'OL']);
+export const othersSubTypeEnum = pgEnum('others_sub_type', ['ATTACHED_OUT', 'COURSE', 'OUTFIELD', 'DUTY', 'VOC', 'SOC', 'ATP_CS', 'MEETING', 'STAY_OUT']);
 export const notificationTypeEnum = pgEnum('notification_type', ['SUBMITTED', 'RESUBMITTED', 'LATE']);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow();
@@ -66,19 +67,22 @@ export const personnel = pgTable('personnel', {
 ]);
 
 export const events = pgTable('events', {
-  /** 'YYYY-MM-DD-AM', 'YYYY-MM-DD-PM' or 'YYYY-MM-DD-X-<id>' */
+  /** 'YYYY-MM-DD-AM', 'YYYY-MM-DD-PM', 'YYYY-MM-DD-RC' or 'YYYY-MM-DD-X-<id>' */
   id: text('id').primaryKey(),
   date: day('date').notNull(),
   type: eventTypeEnum('type').notNull(),
   name: text('name'),
-  cutoffAt: tz('cutoff_at').notNull(),
+  /** Null only for the Roll Call, which has no cut-off. */
+  cutoffAt: tz('cutoff_at'),
   unitId: text('unit_id').references(() => units.id),
   createdBy: uuid('created_by'),
   createdAt: createdAt(),
 }, (t) => [
   index('events_date_idx').on(t.date),
-  uniqueIndex('events_standard_unique').on(t.date, t.type).where(sql`${t.type} IN ('AM', 'PM')`),
+  uniqueIndex('events_standard_unique').on(t.date, t.type).where(sql`${t.type} <> 'ADHOC'`),
   check('events_adhoc_named', sql`${t.type} <> 'ADHOC' OR ${t.name} IS NOT NULL`),
+  // Compared as text so the migration that adds the value can also add the constraint.
+  check('events_cutoff_required', sql`${t.type}::text = 'ROLLCALL' OR ${t.cutoffAt} IS NOT NULL`),
 ]);
 
 /** Absence spans. Rows are immutable: an edit supersedes the row and inserts a replacement. */
@@ -88,6 +92,8 @@ export const statusSpans = pgTable('status_spans', {
   unitId: text('unit_id').notNull().references(() => units.id),
   status: absenceStatusEnum('status').notNull(),
   subType: othersSubTypeEnum('sub_type'),
+  /** 'AM' or 'PM' for a half-day LL or OFF; such a span is a single day. */
+  halfDay: text('half_day'),
   startDate: day('start_date').notNull(),
   endDate: day('end_date'),
   remark: text('remark'),
@@ -99,9 +105,10 @@ export const statusSpans = pgTable('status_spans', {
 }, (t) => [
   index('spans_unit_active_idx').on(t.unitId, t.supersededAt, t.startDate),
   index('spans_person_active_idx').on(t.personId, t.supersededAt),
-  check('spans_rsi_single_day', sql`${t.status} <> 'RSI' OR ${t.endDate} = ${t.startDate}`),
+  check('spans_rsi_single_day', sql`${t.status}::text NOT IN ('RSI', 'RSO') OR ${t.endDate} = ${t.startDate}`),
   check('spans_others_sub_type', sql`${t.status} <> 'OTHERS' OR ${t.subType} IS NOT NULL`),
   check('spans_date_order', sql`${t.endDate} IS NULL OR ${t.endDate} >= ${t.startDate}`),
+  check('spans_half_day', sql`${t.halfDay} IS NULL OR (${t.halfDay} IN ('AM', 'PM') AND ${t.status}::text IN ('LL', 'OFF') AND ${t.endDate} = ${t.startDate})`),
 ]);
 
 /** Confirmed Present for one event. Absence of a row means default Present. */

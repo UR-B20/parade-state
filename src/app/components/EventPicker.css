@@ -31,6 +31,14 @@
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
+/* Phones: 'AM' and 'PM' keep four options on one row. */
+.segmented__short { display: none; }
+@media (max-width: 479px) {
+  .segmented__long { display: none; }
+  .segmented__short { display: inline; }
+  .segmented__option { padding: 0 4px; }
+}
+
 .segmented__option[aria-pressed='true'] {
   background: var(--surface);
   color: var(--primary);

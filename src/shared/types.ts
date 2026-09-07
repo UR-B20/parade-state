@@ -1,9 +1,10 @@
-import type { AbsenceStatus, EffectiveKind, OthersSubType } from './statuses';
+import type { AbsenceStatus, EffectiveKind, HalfDay, OthersSubType } from './statuses';
 import type { IsoDate, IsoTimestamp } from './dates';
 
 export type UnitId = 'CO' | 'S1' | 'S2' | 'S3' | 'S4' | 'SSP' | 'COY1' | 'COY2' | 'ISR';
 export type Role = 'ADMIN' | 'COMMANDER';
-export type EventType = 'AM' | 'PM' | 'ADHOC';
+/** AM and PM parades have cut-offs; the daily Roll Call and ad hoc events are also per date. */
+export type EventType = 'AM' | 'PM' | 'ROLLCALL' | 'ADHOC';
 
 export interface PlatoonDto {
   id: string;
@@ -57,10 +58,11 @@ export interface EventDto {
   id: string;
   date: IsoDate;
   type: EventType;
-  /** Ad hoc event name; null for AM/PM parades. */
+  /** Ad hoc event name; null for the standard events. */
   name: string | null;
-  cutoffAt: IsoTimestamp;
-  /** 'AM parade', 'PM parade' or the ad hoc name. */
+  /** Submission cut-off; null for the Roll Call, which has none and is never Late. */
+  cutoffAt: IsoTimestamp | null;
+  /** 'AM parade', 'PM parade', 'Roll call' or the ad hoc name. */
   label: string;
 }
 
@@ -87,6 +89,8 @@ export interface EffectiveStatus {
   platoonId: string | null;
   status: EffectiveKind;
   subType: OthersSubType | null;
+  /** Half-day LL or OFF: 'AM' (0800–1200) or 'PM' (1200–1800); null for a full day. */
+  halfDay: HalfDay | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;
   remark: string | null;
@@ -100,10 +104,14 @@ export interface UnitCounts {
   present: number;
   /** Neither marked Present nor covered by an absence. */
   unmarked: number;
-  mc: number;
   ll: number;
-  ma: number;
+  off: number;
   rsi: number;
+  rso: number;
+  mc: number;
+  ma: number;
+  hl: number;
+  ol: number;
   others: number;
   absent: number;
 }
@@ -126,6 +134,8 @@ export type SubmissionKind = SubmissionState['kind'];
 export interface StatusTuple {
   status: EffectiveKind;
   subType: OthersSubType | null;
+  /** Absent from snapshots taken before half days existed; read as null. */
+  halfDay?: HalfDay | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;
   remark: string | null;
@@ -179,6 +189,8 @@ export type MarkBody =
       action: 'SET';
       status: AbsenceStatus;
       subType?: OthersSubType | null;
+      /** LL or OFF for half a day; forces a single-day span on the event date. */
+      halfDay?: HalfDay | null;
       startDate: IsoDate;
       endDate: IsoDate | null;
       remark?: string | null;
@@ -220,6 +232,7 @@ export interface AbsenteeDto {
   unitName: string;
   status: AbsenceStatus;
   subType: OthersSubType | null;
+  halfDay: HalfDay | null;
   startDate: IsoDate | null;
   endDate: IsoDate | null;
   remark: string | null;

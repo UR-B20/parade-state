@@ -15,14 +15,15 @@ export interface UnitActivity {
 export interface DeriveSubmissionInput {
   latest: LatestSubmission | null;
   activity: UnitActivity | null;
-  cutoffAt: IsoTimestamp;
+  /** null for events without a cut-off (the Roll Call): never Late, never a late submission. */
+  cutoffAt: IsoTimestamp | null;
   now: Date;
   currentHash: string;
 }
 
 export function deriveSubmissionState(input: DeriveSubmissionInput): SubmissionState {
   const { latest, activity, cutoffAt, now, currentHash } = input;
-  const pastCutoff = now.getTime() >= Date.parse(cutoffAt);
+  const pastCutoff = cutoffAt !== null && now.getTime() >= Date.parse(cutoffAt);
   if (!latest) {
     if (pastCutoff) return { kind: 'LATE', hasActivity: activity !== null, lastChangedAt: activity?.lastChangedAt ?? null };
     if (activity) return { kind: 'PENDING', lastChangedAt: activity.lastChangedAt };
@@ -33,7 +34,7 @@ export function deriveSubmissionState(input: DeriveSubmissionInput): SubmissionS
     version: latest.version,
     submittedAt: latest.submittedAt,
     submittedBy: latest.submittedBy,
-    wasLate: Date.parse(latest.submittedAt) >= Date.parse(cutoffAt),
+    wasLate: cutoffAt !== null && Date.parse(latest.submittedAt) >= Date.parse(cutoffAt),
     hasChanges: currentHash !== latest.contentHash,
   };
 }

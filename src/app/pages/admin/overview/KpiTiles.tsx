@@ -28,6 +28,8 @@ export function KpiTiles({ summary, trends, briefing }: { summary: BattalionSumm
   const presentDelta = briefing.markedRate !== null && briefing.avg7 !== null ? (briefing.markedRate - briefing.avg7) * 100 : null;
   const absentAvg = briefing.avgAbsent7 !== null ? briefing.avgAbsent7 * c.strength : null;
   const absentDelta = absentAvg !== null ? c.absent - absentAvg : null;
+  const cutoffAt = summary.event.cutoffAt;
+  const pastCutoff = cutoffAt !== null && Date.parse(trends.serverNow) >= Date.parse(cutoffAt);
   return (
     <div className="grid grid-cols-2 gap-3 wide:grid-cols-4" role="list" aria-label="Key figures">
       <div role="listitem" className="contents">
@@ -43,7 +45,7 @@ export function KpiTiles({ summary, trends, briefing }: { summary: BattalionSumm
         <Tile
           label="Absent"
           value={String(c.absent)}
-          sub={`${pct(briefing.absentRate, 1)} of strength · MC ${c.mc} · RSI ${c.rsi}`}
+          sub={`${pct(briefing.absentRate, 1)} of strength · MC ${c.mc} · RSI ${c.rsi} · RSO ${c.rso}`}
           delta={absentDelta !== null ? `${signed(absentDelta, 1)} vs 7-day avg ${absentAvg!.toFixed(1)}` : undefined}
           tone={absentDelta === null ? 'neutral' : absentDelta >= 3 ? 'danger' : absentDelta <= -3 ? 'ok' : 'neutral'}
         />
@@ -62,8 +64,8 @@ export function KpiTiles({ summary, trends, briefing }: { summary: BattalionSumm
           label="Branches/Coy submitted"
           value={`${summary.unitsSubmitted} / ${summary.unitsTotal}`}
           sub={`${today.onTime} on time · ${today.late} late`}
-          delta={summary.unitsSubmitted === summary.unitsTotal ? '● Report complete' : Date.parse(trends.serverNow) >= Date.parse(summary.event.cutoffAt) ? '▼ Past the cut-off' : '● Before the cut-off'}
-          tone={summary.unitsSubmitted === summary.unitsTotal ? 'ok' : Date.parse(trends.serverNow) >= Date.parse(summary.event.cutoffAt) ? 'danger' : 'neutral'}
+          delta={summary.unitsSubmitted === summary.unitsTotal ? '● Report complete' : cutoffAt === null ? '● Roll call, no cut-off' : pastCutoff ? '▼ Past the cut-off' : '● Before the cut-off'}
+          tone={summary.unitsSubmitted === summary.unitsTotal ? 'ok' : pastCutoff ? 'danger' : 'neutral'}
         />
       </div>
     </div>

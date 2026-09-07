@@ -1,22 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { STATUS_LABEL, STATUSES, type Status } from '@shared/statuses';
+import { STATUS_LABEL, STATUSES } from '@shared/statuses';
+import { countFor } from '@shared/domain';
 import type { UnitCounts, UnitSummaryRow } from '@shared/types';
 import { Icon } from './Icon';
 import { SubmissionChip, submissionNote } from './SubmissionChip';
 import { PlatoonBreakdown } from './PlatoonPicker';
 import './Admin.css';
-
-function countFor(counts: UnitCounts, status: Status): number {
-  switch (status) {
-    case 'PRESENT': return counts.present;
-    case 'MC': return counts.mc;
-    case 'LL': return counts.ll;
-    case 'MA': return counts.ma;
-    case 'RSI': return counts.rsi;
-    case 'OTHERS': return counts.others;
-  }
-}
 
 export function CountGrid({ counts }: { counts: UnitCounts }) {
   return (

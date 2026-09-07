@@ -43,6 +43,13 @@
       "when": 1788756210763,
       "tag": "0005_usernames_co_office",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788820000000,
+      "tag": "0006_reasons_roll_call",
+      "breakpoints": true
     }
   ]
 }

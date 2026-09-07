@@ -40,7 +40,7 @@ function mean(values: number[]): number | null {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
 
-const STATUS_KEY: Record<AbsenceStatus, keyof UnitCounts> = { MC: 'mc', LL: 'll', MA: 'ma', RSI: 'rsi', OTHERS: 'others' };
+export const STATUS_COUNT_KEY: Record<AbsenceStatus, keyof UnitCounts> = { LL: 'll', OFF: 'off', RSI: 'rsi', RSO: 'rso', MC: 'mc', MA: 'ma', HL: 'hl', OL: 'ol', OTHERS: 'others' };
 
 export function shortDate(date: IsoDate): string {
   return new Date(`${date}T00:00:00+08:00`).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Singapore' });
@@ -78,7 +78,7 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
   // Reporting status first: it decides whether the rest can be trusted.
   const awaiting = t.units.filter((u) => u.pending > 0).map((u) => u.unitName);
   if (awaiting.length > 0) {
-    const pastCutoff = Date.parse(t.serverNow) >= Date.parse(t.event.cutoffAt);
+    const pastCutoff = t.event.cutoffAt !== null && Date.parse(t.serverNow) >= Date.parse(t.event.cutoffAt);
     items.push({
       tone: pastCutoff ? 'danger' : 'warn',
       text: pastCutoff
@@ -89,8 +89,8 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
 
   // Biggest absence driver, against its 7-day run rate.
   if (c.absent > 0) {
-    const top = ABSENCE_STATUSES.map((s) => ({ status: s, n: c[STATUS_KEY[s]] as number })).sort((a, b) => b.n - a.n)[0]!;
-    const avgTop = mean(last7.map((d) => d.counts[STATUS_KEY[top.status]] as number));
+    const top = ABSENCE_STATUSES.map((s) => ({ status: s, n: c[STATUS_COUNT_KEY[s]] as number })).sort((a, b) => b.n - a.n)[0]!;
+    const avgTop = mean(last7.map((d) => d.counts[STATUS_COUNT_KEY[top.status]] as number));
     const share = Math.round((top.n / c.absent) * 100);
     const spike = avgTop !== null && top.n >= 3 && top.n >= avgTop * 1.5;
     items.push({
@@ -146,7 +146,7 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
     const worstRate = rateOf(worst.counts);
     if (worstRate !== null && avg7 - worstRate >= 0.03) {
       const wc = worst.counts;
-      const topThen = ABSENCE_STATUSES.map((s) => ({ status: s, n: wc[STATUS_KEY[s]] as number })).sort((a, b) => b.n - a.n)[0]!;
+      const topThen = ABSENCE_STATUSES.map((s) => ({ status: s, n: wc[STATUS_COUNT_KEY[s]] as number })).sort((a, b) => b.n - a.n)[0]!;
       items.push({ tone: 'neutral', text: `Lowest day in the window: ${shortDate(worst.date)} at ${pct(worstRate)} present, driven by ${STATUS_LONG_LABEL[topThen.status].toLowerCase()} (${topThen.n}).` });
     }
   }

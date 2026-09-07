@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildBriefing, buildTrends, trendDates, type TrendsInput } from '@shared/domain';
+import { buildBriefing, buildTrends, EMPTY_COUNTS, trendDates, type TrendsInput } from '@shared/domain';
 import type { EventDto, UnitCounts, UnitSummaryRow } from '@shared/types';
 
 const counts = (strength: number, present: number, o: Partial<UnitCounts> = {}): UnitCounts => {
-  const c: UnitCounts = { strength, present, unmarked: 0, mc: 0, ll: 0, ma: 0, rsi: 0, others: 0, absent: 0, ...o };
-  c.absent = c.mc + c.ll + c.ma + c.rsi + c.others;
+  const c: UnitCounts = { ...EMPTY_COUNTS, strength, present, ...o };
+  c.absent = c.ll + c.off + c.rsi + c.rso + c.mc + c.ma + c.hl + c.ol + c.others;
   return c;
 };
 const event: EventDto = { id: '2026-09-06-AM', date: '2026-09-06', type: 'AM', name: null, cutoffAt: '2026-09-06T02:00:00.000Z', label: 'AM parade' };

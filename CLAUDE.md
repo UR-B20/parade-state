@@ -35,7 +35,8 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 - Colours: white surfaces `#FFFFFF`, page `#F3F5F8`, text `#172B43`, secondary `#627085`,
   dividers `#E3E8EF`, cobalt primary `#2856CF`. Status colours are reserved and used
   everywhere the status appears: Present `#087969`, MC `#B63B4A`, LL `#8A5C12`, MA `#2B67A9`,
-  RSI `#AC4A32`, Others `#637181`; Not yet marked is light grey `#CBD3DE`. Tokens live in
+  RSI `#AC4A32`, Others `#637181`, and for the reasons added on 7 Sep: OFF `#4F52B8`, RSO
+  `#9C3D84`, HL `#7A2540`, OL `#5F6F1D`; Not yet marked is light grey `#CBD3DE`. Tokens live in
   `src/app/styles/tokens.css`; Tailwind names in `src/app/styles/tailwind.css`.
 - Typography: Inter (self-hosted in `public/fonts`), tabular numerals via `.num` for every
   figure. Touch targets 48px. Light and dark: the same tokens are redefined for dark in
@@ -64,12 +65,27 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 - Explicit marking: every person is marked Present or Not present. Unmarked people are a
   separate bucket ("Not yet marked"), counted in neither present nor absent. Submit to S1 is
   blocked while anyone is unmarked; "Mark remaining Present" bulk-marks after a confirmation.
-- Absences are immutable `status_spans` with start/end dates that keep applying on later
-  parades with nothing to re-enter. RSI is single-day. MC/LL/MA/Others may span days; Others
-  needs a sub-type (Course, Outfield, Attached out, Duty). Present for one event is an
-  `event_marks` row; precedence is mark > covering span > UNMARKED.
-- Only ad hoc events are pre-filled, from each unit's last submitted parade state on or before
-  the event date (Present marks copied; absences come from spans). AM/PM start unmarked.
+- Absence reasons (display order): LL (Local leave), OFF, RSI (Report sick inside), RSO
+  (Report sick outside), MC, MA, HL (Hospitalisation leave), OL (Overseas leave), Others.
+  Others needs a sub-type: VOC, SOC, ATP/CS (`ATP_CS`), Meeting, On course (`COURSE`), Duty,
+  Stay out. The old sub-types ATTACHED_OUT and OUTFIELD stay readable (`LEGACY_SUB_TYPES`)
+  but are not offered. Absences are immutable `status_spans` with start/end dates that keep
+  applying on later parades with nothing to re-enter. RSI and RSO are single-day; the rest may
+  span days. Present for one event is an `event_marks` row; precedence is mark > covering span
+  > UNMARKED. Postgres enum values are appended in the order added, never reordered.
+- Half days: LL and OFF may carry `half_day` 'AM' (0800–1200) or 'PM' (1200–1800); such a span
+  is a single day. `eventHalf()` puts the AM parade in AM, the PM parade in PM, an ad hoc event
+  by its cut-off time and the Roll Call in neither (null). A half-day span covers an event only
+  when the halves match or the event has none, so the person is UNMARKED at the other parade
+  and shows the reason at the Roll Call. Setting a half-day absence only clears Present marks
+  on events in that half (`deleteMarksHalf`). The content hash appends `|AM`/`|PM` only when
+  set, so old submissions keep their hashes.
+- Events per date: AM parade, PM parade, Roll Call (`YYYY-MM-DD-RC`, type ROLLCALL, no cut-off,
+  never Late, optional, excluded from timeliness) and any ad hoc events. Only ad hoc events are
+  pre-filled at creation, from each unit's last submitted parade state on or before the event
+  date. The Roll Call is pre-filled per unit the first time it is opened (`prefillRollCallForUnit`:
+  PM parade if submitted, else AM, else the last parade before that day). AM/PM start unmarked.
+  Roll Call submissions notify S1 like the others.
 - Submissions are versioned with a content hash (UNMARKED lines included); later changes show
   as "changes since submission" until the unit resubmits. States: NOT_MARKED, PENDING, LATE,
   SUBMITTED, RESUBMITTED. Late = not submitted at cut-off (cron 10:05 and 14:05 SGT).
@@ -117,7 +133,7 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 
 ## Status and what is next
 
-- Done: full product as described above; 99 unit/integration tests, 3 e2e, builds green.
+- Done: full product as described above; 110 unit/integration tests, 4 e2e, builds green.
 - Supabase project exists (`acswiwglopwecafpkayt`, Singapore). First deployment is a **real
   roll**: empty personnel, `DEMO_CONTROLS=false`, never run `pnpm seed:demo` against it.
 - The legacy service_role key was pasted into chat once and is compromised: the user is
@@ -178,6 +194,10 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   Office, username sign-in (migration 0005 backfills usernames from the email local part),
   login scene per mock, dark mode, change-password race fixed. Existing accounts' usernames:
   `ranee.uthaya` (admin) and `role_s2br` (commander), editable under Manage accounts.
+- 7 Sep (later): reasons reworked per the owner (LL/OFF with half days, RSO, HL, OL, new
+  Others sub-types) and the daily Roll Call added; migration 0006 (enum values added, events
+  cut-off nullable, `status_spans.half_day`). New enum values are referenced only as text in
+  the migration because the migrator runs all pending migrations in one transaction.
 - Next: optional Hyperdrive on the session pooler; custom domain; otherwise maintenance.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.

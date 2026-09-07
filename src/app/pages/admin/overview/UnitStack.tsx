@@ -6,7 +6,7 @@ import type { BattalionSummaryDto, UnitCounts } from '@shared/types';
 import { pct, rateOf } from '@shared/domain';
 import { ink, ink3, STATUS_COLOR, surface } from '../../../charts/theme';
 import { ChartCard, DataTable, LegendRow } from './ChartCard';
-import { countFor } from './CompositionDonut';
+import { countFor } from '@shared/domain';
 
 const KINDS: EffectiveKind[] = [...STATUSES, 'UNMARKED'];
 const labelFor = (k: EffectiveKind) => (k === 'UNMARKED' ? UNMARKED_LABEL : STATUS_LABEL[k]);

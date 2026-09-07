@@ -10,6 +10,7 @@ let cdr1: string;
 let cdr2: string;
 let daniel: string;
 const AM = '2026-09-06-AM';
+const RC = '2026-09-06-RC';
 
 beforeAll(async () => {
   h = await createHarness({ DEMO_CONTROLS: 'true' } as never);
@@ -96,6 +97,23 @@ describe('submissions', () => {
     // Coy 2 never submitted, so nothing is pre-filled there.
     const coy2 = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${created.body.id}`, { as: cdr2 });
     expect(coy2.body.counts).toMatchObject({ unmarked: 1, present: 0 });
+  });
+
+  it('the Roll Call is pre-filled from the last submitted parade on first open and is never Late', async () => {
+    const view = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${RC}`, { as: cdr1 });
+    expect(view.status).toBe(200);
+    expect(view.body.event).toMatchObject({ type: 'ROLLCALL', label: 'Roll call', cutoffAt: null });
+    const byName = Object.fromEntries(view.body.persons.map((p) => [p.name, p.status]));
+    expect(byName).toEqual({ 'Amir Rahman': 'PRESENT', 'Daniel Tan': 'MC' });
+    expect(view.body.submission.kind).toBe('NOT_MARKED');
+    // Well past both cut-offs (20:00 SGT): the AM parade is Late, the Roll Call is not.
+    await h.json('/admin/demo-clock', { method: 'PUT', as: admin, json: { now: '2026-09-06T12:00:00.000Z' } });
+    const coy2Am = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${AM}`, { as: cdr2 });
+    expect(coy2Am.body.submission.kind).toBe('LATE');
+    const coy2Rc = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${RC}`, { as: cdr2 });
+    expect(coy2Rc.body.submission.kind).toBe('NOT_MARKED');
+    expect(coy2Rc.body.counts).toMatchObject({ unmarked: 1, present: 0 }); // Coy 2 never submitted, so nothing to copy
+    await h.json('/admin/demo-clock', { method: 'PUT', as: admin, json: { now: null } });
   });
 
   it('marks and reads notifications', async () => {

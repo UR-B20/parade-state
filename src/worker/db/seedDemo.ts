@@ -28,10 +28,10 @@ export async function insertDemoData(db: Db, data: DemoDataset, userIds: Map<str
     for (const rows of chunk(data.personnel)) {
       await tx.insert(personnel).values(rows.map((p) => ({ id: p.id, unitId: p.unitId, platoonId: p.platoonId, rank: p.rank, name: p.name, serviceNo: p.serviceNo, postedInDate: p.postedInDate, postedOutDate: p.postedOutDate }))).onConflictDoNothing();
     }
-    await tx.insert(events).values(data.events.map((e) => ({ id: e.id, date: e.date, type: e.type, cutoffAt: new Date(e.cutoffAt) }))).onConflictDoNothing();
+    await tx.insert(events).values(data.events.map((e) => ({ id: e.id, date: e.date, type: e.type, cutoffAt: e.cutoffAt ? new Date(e.cutoffAt) : null }))).onConflictDoNothing();
     for (const rows of chunk(data.spans)) {
       await tx.insert(statusSpans).values(rows.map((s) => ({
-        id: s.id, personId: s.personId, unitId: s.unitId, status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark,
+        id: s.id, personId: s.personId, unitId: s.unitId, status: s.status, subType: s.subType, halfDay: s.halfDay ?? null, startDate: s.startDate, endDate: s.endDate, remark: s.remark,
         createdBy: uid(s.createdBy), createdAt: new Date(s.createdAt),
       }))).onConflictDoNothing();
     }

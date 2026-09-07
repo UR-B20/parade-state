@@ -3,7 +3,7 @@
 Mobile-first parade state reporting for 15C4I Battalion. Because every soldier counts.
 Branch/Coy commanders mark and submit; S1 Branch sees the battalion. Accounts sign in with a
 username; light and dark appearance. Unit commanders mark their personnel for the
-AM parade, PM parade or an ad hoc event and submit to S1. S1 watches present strength and unit
+AM parade, PM parade, the optional daily Roll Call or an ad hoc event and submit to S1. S1 watches present strength and unit
 submissions across the battalion, sees who is absent and why, and exports to Excel or CSV.
 
 - **Frontend and API** run on one Cloudflare Worker (React + Vite, Hono).
@@ -13,18 +13,27 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
 ## How attendance works
 
 - Every person is marked explicitly with **Present** or **Not present**. Choosing Not present
-  opens the reason panel (MC, LL, MA, RSI, Others with a sub-type, dates and a remark). People
+  opens the reason panel: LL (local leave), OFF, RSI (report sick inside), RSO (report sick
+  outside), MC, MA, HL (hospitalisation leave), OL (overseas leave) or Others with a sub-type
+  (VOC, SOC, ATP / CS, Meeting, On course, Duty, Stay out), plus dates and a remark. People
   not yet marked count in neither present nor absent and are listed as "Not yet marked".
+- **LL and OFF can be half a day**: AM is 0800–1200, PM is 1200–1800. A half-day absence only
+  applies to the parade in that half; the person stays "Not yet marked" at the other parade
+  until marked. At the Roll Call (which has no time) the half-day reason is shown.
 - **Submit to S1** is only possible once everyone is marked. **Mark remaining Present** marks
   everyone still unmarked in one confirmed step.
-- **MC, LL, MA and Others** can span several days and keep applying on later parades with
-  nothing to re-enter. **RSI** applies to the selected day only.
+- **LL, OFF, MC, MA, HL, OL and Others** can span several days and keep applying on later
+  parades with nothing to re-enter. **RSI and RSO** apply to the selected day only.
 - Choosing **Present** for someone with an ongoing absence marks this event only; the absence
   keeps running. **Back to Present** ends the absence from today.
 - Saving is automatic. Submitting snapshots the unit's attendance as a version; further changes
   show as "changes since submission" until the unit **resubmits**.
 - **Ad hoc events** created by S1 are pre-filled from each unit's last submitted parade state
   on or before that date. AM and PM parades start unmarked.
+- The **Roll Call** exists for every date without anyone creating it. It has no cut-off, is
+  never Late and is optional. The first time a unit opens it, it is pre-filled from that
+  unit's last submitted parade (the PM parade if submitted, else the AM parade, else the last
+  parade before that day). Submitting it notifies S1 like any other submission.
 - Units become **Late** after the cut-off (AM 10:00, PM 14:00 by default, editable by S1).
 - The S1 **Overview** reads like a briefing: a headline sentence, auto-generated insights, KPI
   tiles with 7-day deltas, the strength composition, present share by unit (with platoon

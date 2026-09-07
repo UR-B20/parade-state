@@ -92,8 +92,9 @@ export interface DemoSpan extends SpanRow {
 export interface DemoEvent {
   id: string;
   date: IsoDate;
-  type: 'AM' | 'PM';
-  cutoffAt: IsoTimestamp;
+  type: 'AM' | 'PM' | 'ROLLCALL';
+  /** null for the Roll Call, which has no cut-off. */
+  cutoffAt: IsoTimestamp | null;
 }
 
 export interface DemoMark {
@@ -188,11 +189,18 @@ function randomName(rng: Prng, used: Set<string>): string {
 }
 
 const OTHERS_REMARKS: Record<OthersSubType, string[]> = {
+  VOC: ['VOC, Kranji Camp', 'VOC, Bedok Camp'],
+  SOC: ['SOC, Pasir Laba', 'SOC, Bedok Camp'],
+  ATP_CS: ['ATP, Pulau Tekong', 'CS, Nee Soon range'],
+  MEETING: ['Bde planning meeting', 'Div conference, Kranji'],
   COURSE: ['Section Leader Course, Pasir Laba', 'Signals Course, Stagmont', 'Medic Course, Nee Soon'],
+  DUTY: ['Guard duty, main gate', 'Camp duty'],
+  STAY_OUT: ['Stay out, approved by OC', 'Stay out'],
   OUTFIELD: ['Bn exercise, Area D', 'Live firing, Pulau Tekong'],
   ATTACHED_OUT: ['Attached to Bde HQ', 'Attached to 3 Div Signals'],
-  DUTY: ['Guard duty, main gate', 'Camp duty'],
 };
+/** Sub-types drawn for random Others absences. */
+const RANDOM_SUB_TYPES = ['COURSE', 'DUTY', 'MEETING', 'VOC', 'SOC', 'ATP_CS', 'STAY_OUT'] as const;
 
 /** Build the whole fictional battalion. Async because submission hashes use WebCrypto. */
 export async function buildDemoDataset(): Promise<DemoDataset> {
@@ -221,6 +229,7 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
   const events: DemoEvent[] = [
     { id: `${date}-AM`, date, type: 'AM', cutoffAt: sgLocalToIso(date, '10:00') },
     { id: `${date}-PM`, date, type: 'PM', cutoffAt: sgLocalToIso(date, '14:00') },
+    { id: `${date}-RC`, date, type: 'ROLLCALL', cutoffAt: null },
   ];
   const am = events[0]!;
 
@@ -237,7 +246,7 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
     { rank: 'LCP', name: 'Amir Rahman' },
     { rank: '3SG', name: 'Ryan Lim' },
     { rank: 'PTE', name: 'Ethan Goh', absence: { status: 'OTHERS', subType: 'COURSE', start: addDays(date, -5), end: addDays(date, 5), remark: 'Section Leader Course, Pasir Laba' } },
-    { rank: 'CPL', name: 'Marcus Lee', absence: { status: 'LL', start: addDays(date, -2), end: addDays(date, 3), remark: 'Ankle sprain, excuse RMJ' } },
+    { rank: 'CPL', name: 'Marcus Lee', absence: { status: 'LL', start: addDays(date, -2), end: addDays(date, 3), remark: 'Family matter, Johor' } },
   ];
   for (const f of fixedCoy1) usedNames.add(f.name);
 
@@ -317,11 +326,11 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
     let ci = 0;
     const take = () => { const p = candidates[ci++]; if (!p) throw new Error(`not enough candidates in ${spec.id}`); return p; };
     for (let i = 0; i < remaining.mc; i++) addSpan(take(), 'MC', null, addDays(date, -rng.int(0, 2)), addDays(date, rng.int(1, 3)), rng.pick(['Fever, Bedok Polyclinic', 'URTI, medical centre', 'Gastroenteritis, CGH', 'Flu, Tampines Polyclinic']));
-    for (let i = 0; i < remaining.ll; i++) addSpan(take(), 'LL', null, addDays(date, -rng.int(0, 3)), addDays(date, rng.int(2, 6)), rng.pick(['Excuse RMJ', 'Excuse boots', 'Excuse heavy load']));
+    for (let i = 0; i < remaining.ll; i++) addSpan(take(), 'LL', null, addDays(date, -rng.int(0, 3)), addDays(date, rng.int(2, 6)), rng.pick(['Family matter', 'Personal matters', 'Wedding, Punggol']));
     for (let i = 0; i < remaining.ma; i++) addSpan(take(), 'MA', null, date, date, rng.pick(['CGH 14:00', 'NUH 09:30', 'Dental, medical centre']));
     for (let i = 0; i < remaining.rsi; i++) addSpan(take(), 'RSI', null, date, date, null);
     for (let i = 0; i < remaining.others; i++) {
-      const subType = rng.pick(['COURSE', 'OUTFIELD', 'ATTACHED_OUT', 'DUTY'] as const);
+      const subType = rng.pick(RANDOM_SUB_TYPES);
       addSpan(take(), 'OTHERS', subType, addDays(date, -rng.int(0, 6)), addDays(date, rng.int(3, 14)), rng.pick(OTHERS_REMARKS[subType]));
     }
 
@@ -412,11 +421,17 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
         const r = rng.next();
         const status: AbsenceStatus = factor > 1.5
           ? (r < 0.45 ? 'RSI' : r < 0.7 ? 'MC' : r < 0.85 ? 'MA' : 'LL')
-          : (r < 0.35 ? 'MC' : r < 0.55 ? 'LL' : r < 0.7 ? 'MA' : r < 0.85 ? 'RSI' : 'OTHERS');
-        const subType = status === 'OTHERS' ? rng.pick(['COURSE', 'OUTFIELD', 'ATTACHED_OUT', 'DUTY'] as const) : null;
-        const wanted = addDays(d, status === 'RSI' || status === 'MA' ? 0 : rng.int(0, 2));
+          : (r < 0.3 ? 'MC' : r < 0.45 ? 'LL' : r < 0.55 ? 'OFF' : r < 0.65 ? 'MA' : r < 0.75 ? 'RSI' : r < 0.8 ? 'RSO' : r < 0.85 ? 'HL' : r < 0.9 ? 'OL' : 'OTHERS');
+        const subType = status === 'OTHERS' ? rng.pick(RANDOM_SUB_TYPES) : null;
+        const wanted = addDays(d, status === 'RSI' || status === 'RSO' || status === 'MA' ? 0 : rng.int(0, 2));
         const end = wanted < lastPast ? wanted : lastPast;
-        const remark = status === 'OTHERS' ? rng.pick(OTHERS_REMARKS[subType!]) : status === 'RSI' ? null : rng.pick(['Medical centre', 'Polyclinic', 'Excuse RMJ']);
+        const remark = status === 'OTHERS'
+          ? rng.pick(OTHERS_REMARKS[subType!])
+          : status === 'RSI' || status === 'RSO' ? null
+            : status === 'LL' || status === 'OFF' ? rng.pick(['Family matter', 'Personal matters', 'Off in lieu'])
+              : status === 'OL' ? rng.pick(['Kuala Lumpur', 'Bangkok', 'Bali'])
+                : status === 'HL' ? rng.pick(['CGH', 'NUH', 'SGH'])
+                  : rng.pick(['Medical centre', 'Polyclinic', 'CGH']);
         spans.push({ id: rng.uuid(), personId: person.id, unitId: spec.id, status, subType, startDate: d, endDate: end, remark, createdAt: sgLocalToIso(d, `0${rng.int(7, 8)}:${minute()}`), createdBy: commander.id });
       }
       if (missedDays[spec.id]?.includes(back)) continue; // Nothing marked, nothing submitted that day.

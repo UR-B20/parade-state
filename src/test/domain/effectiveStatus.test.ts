@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveStatuses, type RollPerson, type SpanRow } from '@shared/domain';
+import { effectiveStatuses, eventHalf, type RollPerson, type SpanRow } from '@shared/domain';
 
 const people: RollPerson[] = [
   { id: 'a', rank: 'CPL', name: 'Daniel Tan', postedInDate: '2025-01-01', postedOutDate: null },
@@ -44,6 +44,23 @@ describe('effectiveStatuses', () => {
   it('picks the newest of two covering spans', () => {
     const spans = [span({ id: 'old', createdAt: '2026-09-05T01:00:00.000Z' }), span({ id: 'new', status: 'LL', createdAt: '2026-09-05T02:00:00.000Z' })];
     expect(effectiveStatuses(people, spans, new Set(), '2026-09-06').find((p) => p.personId === 'a')).toMatchObject({ status: 'LL', spanId: 'new' });
+  });
+
+  it('applies a half-day LL only to events in that half of the day', () => {
+    const spans = [span({ status: 'LL', halfDay: 'PM', startDate: '2026-09-06', endDate: '2026-09-06' })];
+    const on = (half: 'AM' | 'PM' | null) => effectiveStatuses(people, spans, new Set(), '2026-09-06', half).find((p) => p.personId === 'a')!;
+    expect(on('AM').status).toBe('UNMARKED');
+    expect(on('PM')).toMatchObject({ status: 'LL', halfDay: 'PM' });
+    expect(on(null)).toMatchObject({ status: 'LL', halfDay: 'PM' }); // the Roll Call has no half
+    expect(effectiveStatuses(people, spans, new Set(), '2026-09-06').find((p) => p.personId === 'a')?.status).toBe('LL');
+  });
+
+  it('places events in halves: parades by type, ad hoc by cut-off time, the Roll Call in neither', () => {
+    expect(eventHalf({ type: 'AM', cutoffAt: '2026-09-06T02:00:00.000Z' })).toBe('AM');
+    expect(eventHalf({ type: 'PM', cutoffAt: '2026-09-06T06:00:00.000Z' })).toBe('PM');
+    expect(eventHalf({ type: 'ADHOC', cutoffAt: '2026-09-06T03:30:00.000Z' })).toBe('AM'); // 11:30 SGT
+    expect(eventHalf({ type: 'ADHOC', cutoffAt: '2026-09-06T04:00:00.000Z' })).toBe('PM'); // 12:00 SGT
+    expect(eventHalf({ type: 'ROLLCALL', cutoffAt: null })).toBeNull();
   });
 
   it('keeps RSI to its single day', () => {

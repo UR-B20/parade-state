@@ -1,12 +1,13 @@
 import { addDays, type IsoDate } from '../dates';
 import type { MarkBody } from '../types';
-import type { AbsenceStatus, OthersSubType } from '../statuses';
+import { isSingleDay, supportsHalfDay, type AbsenceStatus, type HalfDay, type OthersSubType } from '../statuses';
 import { spanCovers, type SpanRow } from './effectiveStatus';
 
 export interface NewSpan {
   personId: string;
   status: AbsenceStatus;
   subType: OthersSubType | null;
+  halfDay: HalfDay | null;
   startDate: IsoDate;
   endDate: IsoDate | null;
   remark: string | null;
@@ -20,6 +21,8 @@ export interface MarkPlan {
   insertSpans: NewSpan[];
   /** Confirmed-Present marks of this person to delete on events whose date is in this range. */
   deleteMarksInRange: { start: IsoDate; end: IsoDate | null } | null;
+  /** When set, only marks on events in this half of the day (or with no half, the Roll Call) are deleted. */
+  deleteMarksHalf: HalfDay | null;
   /** Insert (or keep) a confirmed-Present mark for the current event. */
   upsertPresentMark: boolean;
 }
@@ -44,7 +47,8 @@ export class MarkValidationError extends Error {
  * - BACK_TO_PRESENT ends any absence covering the event date (truncated to the day
  *   before) and removes future-dated absences, then confirms Present for this event.
  * - SET replaces overlapping absences from the new start date onward. The part of an
- *   existing span before the new start is kept as a truncated copy.
+ *   existing span before the new start is kept as a truncated copy. RSI, RSO and half-day
+ *   LL/OFF are pinned to the event date.
  */
 export function planMark(
   action: MarkBody,
@@ -53,7 +57,7 @@ export function planMark(
   eventDate: IsoDate,
 ): MarkPlan {
   const mine = activeSpans.filter((s) => s.personId === personId);
-  const plan: MarkPlan = { supersedeSpanIds: [], insertSpans: [], deleteMarksInRange: null, upsertPresentMark: false };
+  const plan: MarkPlan = { supersedeSpanIds: [], insertSpans: [], deleteMarksInRange: null, deleteMarksHalf: null, upsertPresentMark: false };
 
   if (action.action === 'PRESENT') {
     plan.upsertPresentMark = true;
@@ -65,7 +69,7 @@ export function planMark(
       if (spanCovers(span, eventDate)) {
         plan.supersedeSpanIds.push(span.id);
         if (span.startDate < eventDate) {
-          plan.insertSpans.push({ personId, status: span.status, subType: span.subType, startDate: span.startDate, endDate: addDays(eventDate, -1), remark: span.remark, replacesId: span.id });
+          plan.insertSpans.push({ personId, status: span.status, subType: span.subType, halfDay: span.halfDay ?? null, startDate: span.startDate, endDate: addDays(eventDate, -1), remark: span.remark, replacesId: span.id });
         }
       } else if (span.startDate > eventDate) {
         plan.supersedeSpanIds.push(span.id);
@@ -79,7 +83,9 @@ export function planMark(
   const status = action.status;
   let start = action.startDate;
   let end = action.endDate;
-  if (status === 'RSI') {
+  const halfDay = action.halfDay ?? null;
+  if (halfDay && !supportsHalfDay(status)) throw new MarkValidationError('Only LL and OFF can be half a day', 'halfDay');
+  if (isSingleDay(status) || halfDay) {
     start = eventDate;
     end = eventDate;
   }
@@ -95,10 +101,11 @@ export function planMark(
     if (!overlaps) continue;
     plan.supersedeSpanIds.push(span.id);
     if (span.startDate < start) {
-      plan.insertSpans.push({ personId, status: span.status, subType: span.subType, startDate: span.startDate, endDate: addDays(start, -1), remark: span.remark, replacesId: span.id });
+      plan.insertSpans.push({ personId, status: span.status, subType: span.subType, halfDay: span.halfDay ?? null, startDate: span.startDate, endDate: addDays(start, -1), remark: span.remark, replacesId: span.id });
     }
   }
-  plan.insertSpans.push({ personId, status, subType, startDate: start, endDate: end, remark, replacesId: null });
+  plan.insertSpans.push({ personId, status, subType, halfDay, startDate: start, endDate: end, remark, replacesId: null });
   plan.deleteMarksInRange = { start, end };
+  plan.deleteMarksHalf = halfDay;
   return plan;
 }

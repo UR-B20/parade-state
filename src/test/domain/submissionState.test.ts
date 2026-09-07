@@ -30,6 +30,12 @@ describe('deriveSubmissionState', () => {
     expect(deriveSubmissionState({ latest: { ...latest, submittedAt: '2026-09-06T02:14:00.000Z' }, activity: null, cutoffAt, now: after, currentHash: 'h1' })).toMatchObject({ wasLate: true });
   });
 
+  it('never turns an event without a cut-off (the Roll Call) Late', () => {
+    expect(deriveSubmissionState({ latest: null, activity: null, cutoffAt: null, now: after, currentHash: 'h' })).toEqual({ kind: 'NOT_MARKED' });
+    expect(deriveSubmissionState({ latest: null, activity: { lastChangedAt: 'x' }, cutoffAt: null, now: after, currentHash: 'h' })).toEqual({ kind: 'PENDING', lastChangedAt: 'x' });
+    expect(deriveSubmissionState({ latest: { ...latest, submittedAt: '2026-09-06T12:00:00.000Z' }, activity: null, cutoffAt: null, now: after, currentHash: 'h1' })).toMatchObject({ kind: 'SUBMITTED', wasLate: false });
+  });
+
   it('ranks awaiting units Late, Pending, Not marked', () => {
     expect(awaitingRank({ kind: 'LATE', hasActivity: false, lastChangedAt: null })).toBeLessThan(awaitingRank({ kind: 'PENDING', lastChangedAt: 'x' }));
     expect(awaitingRank({ kind: 'PENDING', lastChangedAt: 'x' })).toBeLessThan(awaitingRank({ kind: 'NOT_MARKED' }));

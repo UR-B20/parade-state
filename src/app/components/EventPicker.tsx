@@ -16,18 +16,23 @@ interface EventPickerProps {
 export function EventPicker({ date, events, selectedId, onSelect, onDateChange, onCreateAdhoc }: EventPickerProps) {
   const am = events?.find((e) => e.type === 'AM');
   const pm = events?.find((e) => e.type === 'PM');
+  const rollCall = events?.find((e) => e.type === 'ROLLCALL');
   const adhoc = events?.filter((e) => e.type === 'ADHOC') ?? [];
   const selectedAdhoc = adhoc.find((e) => e.id === selectedId);
+
+  const standard = (event: EventDto | undefined, label: string, short: string) => (
+    <button type="button" className="segmented__option" aria-label={label} aria-pressed={!!event && selectedId === event.id} disabled={!event} onClick={() => event && onSelect(event.id)}>
+      <span className="segmented__long">{label}</span>
+      <span className="segmented__short" aria-hidden="true">{short}</span>
+    </button>
+  );
 
   return (
     <div className="event-picker">
       <div className="segmented" role="group" aria-label="Event">
-        <button type="button" className="segmented__option" aria-pressed={!!am && selectedId === am.id} disabled={!am} onClick={() => am && onSelect(am.id)}>
-          AM parade
-        </button>
-        <button type="button" className="segmented__option" aria-pressed={!!pm && selectedId === pm.id} disabled={!pm} onClick={() => pm && onSelect(pm.id)}>
-          PM parade
-        </button>
+        {standard(am, 'AM parade', 'AM')}
+        {standard(pm, 'PM parade', 'PM')}
+        {standard(rollCall, 'Roll call', 'Roll call')}
         {adhoc.length > 0 || onCreateAdhoc ? (
           <AdhocOption
             adhoc={adhoc}

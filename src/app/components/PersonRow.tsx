@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { formatSgDateShort, type IsoDate } from '@shared/dates';
-import { STATUS_LABEL, SUB_TYPE_LABEL, UNMARKED_LABEL } from '@shared/statuses';
+import { HALF_DAY_HOURS, isSingleDay, statusLabel, SUB_TYPE_LABEL, UNMARKED_LABEL } from '@shared/statuses';
 import type { EffectiveStatus } from '@shared/types';
 import { StatusPill } from './StatusPill';
 import './PersonRow.css';
@@ -16,16 +16,17 @@ interface PersonRowProps {
   onPresent: (person: EffectiveStatus) => void;
 }
 
-/** 'MC · Until 8 Sep' / 'Others · Course, until 11 Sep' / 'Not yet marked' */
+/** 'MC · Until 8 Sep' / 'Others · On course, until 11 Sep' / 'LL (PM) · Half day, 1200–1800' / 'Not yet marked' */
 export function describeStatus(p: EffectiveStatus, eventDate: IsoDate): string {
   if (p.status === 'UNMARKED') return UNMARKED_LABEL;
   if (p.status === 'PRESENT') return 'Present';
   const parts: string[] = [];
   if (p.status === 'OTHERS' && p.subType) parts.push(SUB_TYPE_LABEL[p.subType]);
-  if (p.status === 'RSI' || (p.startDate === eventDate && p.endDate === eventDate)) parts.push('Today only');
+  if (p.halfDay) parts.push(`Half day, ${HALF_DAY_HOURS[p.halfDay]}`);
+  else if (isSingleDay(p.status) || (p.startDate === eventDate && p.endDate === eventDate)) parts.push('Today only');
   else if (p.endDate) parts.push(p.endDate === eventDate ? 'Until today' : `Until ${formatSgDateShort(p.endDate, eventDate)}`);
   else parts.push('No end date');
-  return `${STATUS_LABEL[p.status]} · ${parts.join(', ')}`;
+  return `${statusLabel(p.status, p.halfDay)} · ${parts.join(', ')}`;
 }
 
 /** Secondary line under the name: absence detail, or nothing for a marked Present. */
@@ -65,7 +66,7 @@ export const PersonRow = memo(function PersonRow({ person, eventDate, pending, d
           </span>
         ) : (
           <button type="button" className="person__pill" disabled={disabled} onClick={() => onOpen(person)} aria-label={`Change status for ${person.name}`}>
-            <StatusPill status={person.status} />
+            <StatusPill status={person.status} halfDay={person.halfDay} />
           </button>
         )}
       </span>

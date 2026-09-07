@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { STATUS_LABEL, STATUSES, UNMARKED_LABEL, type EffectiveKind } from '@shared/statuses';
+import { countFor } from '@shared/domain';
 import type { UnitCounts } from '@shared/types';
 import './StrengthSummary.css';
 
@@ -19,18 +20,6 @@ interface StrengthSummaryProps {
 
 const KINDS: EffectiveKind[] = [...STATUSES, 'UNMARKED'];
 const labelFor = (k: EffectiveKind) => (k === 'UNMARKED' ? UNMARKED_LABEL : STATUS_LABEL[k]);
-
-function countFor(counts: UnitCounts, status: EffectiveKind): number {
-  switch (status) {
-    case 'PRESENT': return counts.present;
-    case 'UNMARKED': return counts.unmarked;
-    case 'MC': return counts.mc;
-    case 'LL': return counts.ll;
-    case 'MA': return counts.ma;
-    case 'RSI': return counts.rsi;
-    case 'OTHERS': return counts.others;
-  }
-}
 
 export function StatusBand({ counts, label }: { counts: UnitCounts; label: string }) {
   const parts = KINDS.map((s) => ({ status: s, n: countFor(counts, s) })).filter((p) => p.n > 0);

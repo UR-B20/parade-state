@@ -22,10 +22,14 @@ export const surface = () => cssVar('--surface', '#ffffff');
 
 export const STATUS_COLOR: Record<string, () => string> = {
   PRESENT: () => cssVar('--present', '#087969'),
-  MC: () => cssVar('--mc', '#b63b4a'),
   LL: () => cssVar('--ll', '#8a5c12'),
-  MA: () => cssVar('--ma', '#2b67a9'),
+  OFF: () => cssVar('--off', '#4f52b8'),
   RSI: () => cssVar('--rsi', '#ac4a32'),
+  RSO: () => cssVar('--rso', '#9c3d84'),
+  MC: () => cssVar('--mc', '#b63b4a'),
+  MA: () => cssVar('--ma', '#2b67a9'),
+  HL: () => cssVar('--hl', '#7a2540'),
+  OL: () => cssVar('--ol', '#5f6f1d'),
   OTHERS: () => cssVar('--others', '#637181'),
   UNMARKED: () => cssVar('--line-strong', '#cbd3de'),
 };

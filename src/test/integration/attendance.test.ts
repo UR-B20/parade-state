@@ -8,6 +8,7 @@ let cdr1: string;
 let cdr2: string;
 const AM = '2026-09-06-AM';
 const PM = '2026-09-06-PM';
+const RC = '2026-09-06-RC';
 const people: Record<string, PersonDto> = {};
 
 beforeAll(async () => {
@@ -28,12 +29,13 @@ const mark = (eventId: string, personId: string, json: unknown, as = cdr1) => h.
 const statusOf = (dto: UnitAttendanceDto, name: string) => dto.persons.find((p) => p.name === name)!;
 
 describe('events', () => {
-  it('creates AM and PM parades for a date on first request, with cut-offs from settings', async () => {
+  it('creates the AM and PM parades and the Roll Call for a date on first request, with cut-offs from settings', async () => {
     const { status, body } = await h.json<EventDto[]>('/events?date=2026-09-06', { as: cdr1 });
     expect(status).toBe(200);
-    expect(body.map((e) => e.id)).toEqual([AM, PM]);
+    expect(body.map((e) => e.id)).toEqual([AM, PM, RC]);
     expect(body[0]!.cutoffAt).toBe('2026-09-06T02:00:00.000Z');
     expect(body[1]!.cutoffAt).toBe('2026-09-06T06:00:00.000Z');
+    expect(body[2]).toMatchObject({ type: 'ROLLCALL', label: 'Roll call', cutoffAt: null });
   });
 
   it('lets only S1 create ad hoc events', async () => {
@@ -42,7 +44,7 @@ describe('events', () => {
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({ type: 'ADHOC', label: 'Route march', cutoffAt: '2026-09-06T07:00:00.000Z' });
     const list = await h.json<EventDto[]>('/events?date=2026-09-06', { as: admin });
-    expect(list.body).toHaveLength(3);
+    expect(list.body).toHaveLength(4);
   });
 });
 
@@ -136,6 +138,23 @@ describe('attendance', () => {
     expect(statusOf(res.body, 'Amir Rahman').status).toBe('RSI');
     expect(statusOf(res.body, 'Ryan Lim').status).toBe('PRESENT');
     expect((await h.request(`/units/COY1/attendance/${AM}/mark-remaining-present`, { method: 'POST', as: admin })).status).toBe(403);
+  });
+
+  it('a half-day LL applies to that half only and keeps the other parade\'s Present mark', async () => {
+    const ryan = people['Ryan Lim']!.id;
+    expect((await mark(AM, ryan, { action: 'PRESENT' })).status).toBe(200);
+    const res = await mark(PM, ryan, { action: 'SET', status: 'LL', halfDay: 'PM', startDate: '2026-09-01', endDate: '2026-09-09' });
+    expect(res.status).toBe(200);
+    expect(res.body.person).toMatchObject({ status: 'LL', halfDay: 'PM', startDate: '2026-09-06', endDate: '2026-09-06' });
+    expect(statusOf((await attendance(AM)).body, 'Ryan Lim').status).toBe('PRESENT'); // the AM mark survives
+    expect(statusOf((await attendance(RC)).body, 'Ryan Lim')).toMatchObject({ status: 'LL', halfDay: 'PM' }); // the Roll Call has no half
+    expect(statusOf((await attendance('2026-09-07-AM')).body, 'Ryan Lim').status).toBe('UNMARKED');
+    // Only LL and OFF can be half a day; RSO is single-day like RSI.
+    expect((await mark(PM, ryan, { action: 'SET', status: 'MC', halfDay: 'AM', startDate: '2026-09-06', endDate: null })).status).toBe(400);
+    const rso = await mark(PM, ryan, { action: 'SET', status: 'RSO', startDate: '2026-09-01', endDate: null });
+    expect(rso.body.person).toMatchObject({ status: 'RSO', halfDay: null, startDate: '2026-09-06', endDate: '2026-09-06' });
+    expect(statusOf((await attendance(AM)).body, 'Ryan Lim').status).toBe('RSO'); // a full-day absence clears the AM mark
+    expect((await mark(AM, ryan, { action: 'BACK_TO_PRESENT' })).body.person.status).toBe('PRESENT');
   });
 
   it('validates mark bodies', async () => {

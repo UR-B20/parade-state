@@ -95,4 +95,25 @@ test.describe('SoldierTrack', () => {
     await expect(page.getByText('Late').first()).toBeVisible();
     await expect(page.getByText('Cut-off 10:00 passed')).toBeVisible();
   });
+
+  test('a half-day LL applies to one parade only and the Roll Call needs no set-up', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Sign in as Coy 1 commander' }).click();
+    await expect(page.getByRole('heading', { name: 'Coy 1' })).toBeVisible();
+    await page.getByRole('button', { name: /Ryan Lim/ }).first().click();
+    const sheet = page.locator('dialog[open]');
+    await sheet.getByRole('button', { name: 'Not present' }).click();
+    await sheet.getByRole('button', { name: /^LL/ }).click();
+    await sheet.getByRole('button', { name: /^PM/ }).click();
+    await expect(sheet.getByText(/LL for the PM half of/)).toBeVisible();
+    await sheet.getByRole('button', { name: 'Save', exact: true }).click();
+    // The AM parade keeps his Present mark; the PM parade and the Roll Call show the half-day leave.
+    await expect(page.getByRole('button', { name: /Ryan Lim, Present/ })).toBeVisible();
+    await page.getByRole('button', { name: 'PM parade' }).click();
+    await expect(page.getByRole('button', { name: /Ryan Lim, LL \(PM\) · Half day, 1200–1800/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Roll call' }).click();
+    await expect(page.getByRole('button', { name: /Ryan Lim, LL \(PM\)/ })).toBeVisible();
+    await expect(page.getByText(/^Cut-off/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Mark remaining \d+ Present/ })).toBeVisible();
+  });
 });

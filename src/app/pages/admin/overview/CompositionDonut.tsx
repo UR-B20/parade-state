@@ -3,25 +3,13 @@ import { Doughnut } from 'react-chartjs-2';
 import type { ChartData, ChartOptions } from 'chart.js';
 import { STATUS_LABEL, STATUSES, UNMARKED_LABEL, type EffectiveKind } from '@shared/statuses';
 import type { UnitCounts } from '@shared/types';
-import { markedRateOf, pct } from '@shared/domain';
+import { countFor, markedRateOf, pct } from '@shared/domain';
 import { STATUS_COLOR, surface } from '../../../charts/theme';
 import { StatusLegend } from '../../../components/StrengthSummary';
 import { ChartCard, DataTable } from './ChartCard';
 
 const KINDS: EffectiveKind[] = [...STATUSES, 'UNMARKED'];
 const labelFor = (k: EffectiveKind) => (k === 'UNMARKED' ? UNMARKED_LABEL : STATUS_LABEL[k]);
-
-export function countFor(counts: UnitCounts, k: EffectiveKind): number {
-  switch (k) {
-    case 'PRESENT': return counts.present;
-    case 'UNMARKED': return counts.unmarked;
-    case 'MC': return counts.mc;
-    case 'LL': return counts.ll;
-    case 'MA': return counts.ma;
-    case 'RSI': return counts.rsi;
-    case 'OTHERS': return counts.others;
-  }
-}
 
 export function CompositionDonut({ counts, title = 'Strength composition', subtitle }: { counts: UnitCounts; title?: string; subtitle?: string }) {
   const parts = useMemo(() => KINDS.map((k) => ({ kind: k, n: countFor(counts, k) })).filter((p) => p.n > 0), [counts]);

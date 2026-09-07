@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { IsoDate } from '@shared/dates';
 import {
-  contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, unitCounts,
+  contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, eventHalf, MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, unitCounts,
   type SpanRow,
 } from '@shared/domain';
+import type { HalfDay } from '@shared/statuses';
 import type { ChangeDiff, EffectiveStatus, MarkBody, MarkResultDto, SubmissionState, UnitAttendanceDto, UnitCounts, UnitDto } from '@shared/types';
 import type { Db } from '../db/client';
 import { eventMarks, events, personnel, statusSpans, submissions, unitEventState, type EventRow, type ProfileRow } from '../db/schema';
@@ -13,13 +14,14 @@ import { toEventDto } from './events';
 import { activePersonnelOn } from './roll';
 import { isLockedForCommander, resolveNow } from './settings';
 import { getUnitWithPlatoons } from './platoons';
+import { prefillRollCallForUnit } from './prefill';
 
 export async function getUnit(db: Db, unitId: string): Promise<UnitDto> {
   return getUnitWithPlatoons(db, unitId);
 }
 
 export function toSpanRow(s: typeof statusSpans.$inferSelect): SpanRow {
-  return { id: s.id, personId: s.personId, status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark, createdAt: s.createdAt.toISOString() };
+  return { id: s.id, personId: s.personId, status: s.status, subType: s.subType, halfDay: (s.halfDay as HalfDay | null) ?? null, startDate: s.startDate, endDate: s.endDate, remark: s.remark, createdAt: s.createdAt.toISOString() };
 }
 
 export async function activeSpansForUnit(db: Db, unitId: string): Promise<SpanRow[]> {
@@ -36,12 +38,14 @@ export interface UnitComputation {
   statuses: EffectiveStatus[];
   counts: UnitCounts;
   hash: string;
+  /** Present marks found for this event (used to decide whether a Roll Call still needs pre-filling). */
+  markCount: number;
 }
 
 export async function computeUnit(db: Db, unitId: string, event: EventRow): Promise<UnitComputation> {
   const [people, spans, marks] = await Promise.all([activePersonnelOn(db, unitId, event.date), activeSpansForUnit(db, unitId), presentMarksFor(db, unitId, event.id)]);
-  const statuses = effectiveStatuses(people, spans, marks, event.date);
-  return { statuses, counts: unitCounts(statuses), hash: await contentHash(statuses) };
+  const statuses = effectiveStatuses(people, spans, marks, event.date, eventHalf(event));
+  return { statuses, counts: unitCounts(statuses), hash: await contentHash(statuses), markCount: marks.size };
 }
 
 export async function latestSubmission(db: Db, unitId: string, eventId: string) {
@@ -59,7 +63,7 @@ export async function submissionStateFor(db: Db, unitId: string, event: EventRow
   const state = deriveSubmissionState({
     latest: latest ? { version: latest.version, submittedAt: latest.submittedAt.toISOString(), submittedBy: latest.submittedBy, contentHash: latest.contentHash } : null,
     activity: activity ? { lastChangedAt: activity.lastChangedAt.toISOString() } : null,
-    cutoffAt: event.cutoffAt.toISOString(),
+    cutoffAt: event.cutoffAt?.toISOString() ?? null,
     now,
     currentHash: hash,
   });
@@ -72,8 +76,16 @@ export async function submissionStateFor(db: Db, unitId: string, event: EventRow
 
 export async function loadUnitState(db: Db, env: Bindings, unitId: string, event: EventRow, user: ProfileRow, realNow: Date): Promise<UnitAttendanceDto> {
   const [unit, { now }] = await Promise.all([getUnit(db, unitId), resolveNow(db, env, realNow)]);
-  const { statuses, counts, hash } = await computeUnit(db, unitId, event);
-  const sub = await submissionStateFor(db, unitId, event, hash, now, statuses);
+  let { statuses, counts, hash, markCount } = await computeUnit(db, unitId, event);
+  let sub = await submissionStateFor(db, unitId, event, hash, now, statuses);
+  // A Roll Call nobody has touched yet starts from the unit's last submitted parade.
+  if (event.type === 'ROLLCALL' && markCount === 0 && sub.state.kind === 'NOT_MARKED') {
+    const copied = await prefillRollCallForUnit(db, unitId, event, user.id, realNow);
+    if (copied > 0) {
+      ({ statuses, counts, hash } = await computeUnit(db, unitId, event));
+      sub = await submissionStateFor(db, unitId, event, hash, now, statuses);
+    }
+  }
   const locked = user.role === 'ADMIN' ? false : await isLockedForCommander(db, event.date, now);
   return { unit, event: toEventDto(event), persons: statuses, counts, platoons: platoonBreakdown(statuses, unit.platoons), submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
 }
@@ -108,13 +120,21 @@ export async function applyMark(db: Db, env: Bindings, unitId: string, event: Ev
     }
     if (plan.insertSpans.length) {
       await tx.insert(statusSpans).values(plan.insertSpans.map((s) => ({
-        personId: s.personId, unitId, status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark, createdBy: user.id, createdAt: realNow, replacesId: s.replacesId,
+        personId: s.personId, unitId, status: s.status, subType: s.subType, halfDay: s.halfDay, startDate: s.startDate, endDate: s.endDate, remark: s.remark, createdBy: user.id, createdAt: realNow, replacesId: s.replacesId,
       })));
     }
     if (plan.deleteMarksInRange) {
       const { start, end } = plan.deleteMarksInRange;
-      const inRange = tx.select({ id: events.id }).from(events).where(end ? sql`${events.date} >= ${start} AND ${events.date} <= ${end}` : sql`${events.date} >= ${start}`);
-      await tx.delete(eventMarks).where(and(eq(eventMarks.personId, personId), inArray(eventMarks.eventId, inRange)));
+      const dateFilter = end ? sql`${events.date} >= ${start} AND ${events.date} <= ${end}` : sql`${events.date} >= ${start}`;
+      if (plan.deleteMarksHalf) {
+        // A half-day absence only clears Present marks on events in that half (and the Roll Call, which has none).
+        const candidates = await tx.select().from(events).where(dateFilter);
+        const ids = candidates.filter((e) => { const h = eventHalf(e); return h === null || h === plan.deleteMarksHalf; }).map((e) => e.id);
+        if (ids.length) await tx.delete(eventMarks).where(and(eq(eventMarks.personId, personId), inArray(eventMarks.eventId, ids)));
+      } else {
+        const inRange = tx.select({ id: events.id }).from(events).where(dateFilter);
+        await tx.delete(eventMarks).where(and(eq(eventMarks.personId, personId), inArray(eventMarks.eventId, inRange)));
+      }
     }
     if (plan.upsertPresentMark) {
       await tx.insert(eventMarks).values({ eventId: event.id, personId, unitId, markedBy: user.id, markedAt: realNow }).onConflictDoNothing();

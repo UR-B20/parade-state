@@ -4,13 +4,13 @@
  * rules as the Worker so the UI behaves identically against either.
  */
 import { addDays, formatSgTime, sgDateOf, sgLocalToIso, type IsoDate, type IsoTimestamp } from '@shared/dates';
-import type { AbsenceStatus } from '@shared/statuses';
+import { ABSENCE_STATUSES, statusLabel, type AbsenceStatus } from '@shared/statuses';
 import type {
   AbsenteesDto, BattalionSummaryDto, EventDto, MarkBody, MarkResultDto, MeDto, NotificationsDto, PersonDto, PlatoonDto,
   SettingsDto, SubmissionDto, SubmissionState, TrendsDto, UnitAttendanceDto, UnitDto, UnitId, UserDto,
 } from '@shared/types';
 import {
-  awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, isDateLocked,
+  awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, eventHalf, isDateLocked, spanCoversEvent,
   MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, buildTrends, trendDates, type SnapshotEntry, type SpanRow, type TrendSubmission,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
@@ -87,17 +87,45 @@ export class MockApi implements ApiClient {
   }
 
   private eventLabel(type: EventDto['type'], name: string | null): string {
-    return type === 'AM' ? 'AM parade' : type === 'PM' ? 'PM parade' : name ?? 'Ad hoc';
+    return type === 'AM' ? 'AM parade' : type === 'PM' ? 'PM parade' : type === 'ROLLCALL' ? 'Roll call' : name ?? 'Ad hoc';
   }
 
   private eventById(eventId: string): EventDto {
     const adhoc = this.adhoc.find((e) => e.id === eventId);
     if (adhoc) return adhoc;
-    const m = /^(\d{4}-\d{2}-\d{2})-(AM|PM)$/.exec(eventId);
+    const m = /^(\d{4}-\d{2}-\d{2})-(AM|PM|RC)$/.exec(eventId);
     if (!m) throw new ApiError('NOT_FOUND', 'Event not found', 404);
     const date = m[1]!;
+    if (m[2] === 'RC') return { id: eventId, date, type: 'ROLLCALL', name: null, cutoffAt: null, label: this.eventLabel('ROLLCALL', null) };
     const type = m[2] as 'AM' | 'PM';
     return { id: eventId, date, type, name: null, cutoffAt: sgLocalToIso(date, type === 'AM' ? this.cutoffs.am : this.cutoffs.pm), label: this.eventLabel(type, null) };
+  }
+
+  /** Personnel who can take a copied Present mark: on strength and not covered by an absence for the event. */
+  private prefillCandidates(unitId: UnitId, event: EventDto): Set<string> {
+    const half = eventHalf(event);
+    const covered = new Set(this.activeSpans(unitId).filter((s) => spanCoversEvent(s, event.date, half)).map((s) => s.personId));
+    return new Set(this.data.personnel.filter((p) => p.unitId === unitId && p.postedInDate <= event.date && (p.postedOutDate === null || p.postedOutDate > event.date) && !covered.has(p.id)).map((p) => p.id));
+  }
+
+  /** The Roll Call starts from the unit's last submitted parade the first time anyone opens it. */
+  private prefillRollCall(unitId: UnitId, event: EventDto, userId: string) {
+    if (event.type !== 'ROLLCALL') return;
+    if (this.data.marks.some((m) => m.unitId === unitId && m.eventId === event.id)) return;
+    if (this.data.submissions.some((s) => s.unitId === unitId && s.eventId === event.id)) return;
+    if (this.data.unitEventState.some((s) => s.unitId === unitId && s.eventId === event.id)) return;
+    const order = { PM: 1, AM: 0 } as Record<string, number>;
+    const latest = this.data.submissions
+      .map((s) => ({ s, ev: this.eventById(s.eventId) }))
+      .filter(({ s, ev }) => s.unitId === unitId && (ev.type === 'AM' || ev.type === 'PM') && ev.date <= event.date && s.submittedAt <= this.nowIso())
+      .sort((a, b) => (a.ev.date !== b.ev.date ? (a.ev.date < b.ev.date ? 1 : -1) : (order[b.ev.type] ?? 0) - (order[a.ev.type] ?? 0) || b.s.version - a.s.version))[0]?.s;
+    if (!latest) return;
+    const active = this.prefillCandidates(unitId, event);
+    for (const entry of latest.snapshot) {
+      if (entry.status === 'PRESENT' && active.has(entry.personId)) {
+        this.data.marks.push({ eventId: event.id, personId: entry.personId, unitId, markedBy: userId, markedAt: this.nowIso() });
+      }
+    }
   }
 
   private activeSpans(unitId: string): DemoSpan[] {
@@ -108,7 +136,7 @@ export class MockApi implements ApiClient {
     const people = this.data.personnel.filter((p) => p.unitId === unitId);
     const spans = this.activeSpans(unitId);
     const marks = new Set(this.data.marks.filter((m) => m.unitId === unitId && m.eventId === event.id).map((m) => m.personId));
-    const statuses = effectiveStatuses(people, spans, marks, event.date);
+    const statuses = effectiveStatuses(people, spans, marks, event.date, eventHalf(event));
     return { statuses, counts: unitCounts(statuses) };
   }
 
@@ -228,6 +256,7 @@ export class MockApi implements ApiClient {
     return this.wait(() => [
       this.eventById(`${date}-AM`),
       this.eventById(`${date}-PM`),
+      this.eventById(`${date}-RC`),
       ...this.adhoc.filter((e) => e.date === date),
     ]);
   }
@@ -243,7 +272,7 @@ export class MockApi implements ApiClient {
           .filter((s) => s.unitId === unit.id && this.eventById(s.eventId).date <= ev.date && s.submittedAt <= this.nowIso())
           .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1))[0];
         if (!latest) continue;
-        const active = new Set(this.data.personnel.filter((p) => p.unitId === unit.id && p.postedInDate <= ev.date && (p.postedOutDate === null || p.postedOutDate > ev.date)).map((p) => p.id));
+        const active = this.prefillCandidates(unit.id, ev);
         for (const entry of latest.snapshot) {
           if (entry.status === 'PRESENT' && active.has(entry.personId)) {
             this.data.marks.push({ eventId: ev.id, personId: entry.personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
@@ -296,10 +325,11 @@ export class MockApi implements ApiClient {
     return this.wait(async () => {
       const unit = this.unit(unitId);
       const event = this.eventById(eventId);
+      const user = this.currentUser();
+      this.prefillRollCall(unit.id, event, user.id);
       const { statuses, counts } = this.computeUnit(unitId, event);
       const hash = await contentHash(statuses);
       const sub = await this.submissionFor(unitId, event, hash);
-      const user = this.currentUser();
       const locked = user.role === 'ADMIN' ? false : isDateLocked(event.date, this.today(), this.unlocks, this.now());
       return { unit, event, persons: statuses, counts, platoons: platoonBreakdown(statuses, unit.platoons), submission: sub.state, changes: sub.changes, updatedAt: sub.updatedAt, locked, contentHash: hash };
     });
@@ -325,14 +355,19 @@ export class MockApi implements ApiClient {
       const nowIso = this.nowIso();
       this.data.spans = this.data.spans.filter((s) => !plan.supersedeSpanIds.includes(s.id));
       for (const ns of plan.insertSpans) {
-        this.data.spans.push({ id: this.newId('span'), unitId: unit.id, personId: ns.personId, status: ns.status as AbsenceStatus, subType: ns.subType, startDate: ns.startDate, endDate: ns.endDate, remark: ns.remark, createdAt: nowIso, createdBy: user.id });
+        this.data.spans.push({ id: this.newId('span'), unitId: unit.id, personId: ns.personId, status: ns.status as AbsenceStatus, subType: ns.subType, halfDay: ns.halfDay, startDate: ns.startDate, endDate: ns.endDate, remark: ns.remark, createdAt: nowIso, createdBy: user.id });
       }
       if (plan.deleteMarksInRange) {
         const { start, end } = plan.deleteMarksInRange;
         this.data.marks = this.data.marks.filter((m) => {
           if (m.personId !== personId) return true;
-          const d = this.eventById(m.eventId).date;
-          return !(d >= start && (end === null || d <= end));
+          const ev = this.eventById(m.eventId);
+          if (!(ev.date >= start && (end === null || ev.date <= end))) return true;
+          if (plan.deleteMarksHalf) {
+            const h = eventHalf(ev);
+            return h !== null && h !== plan.deleteMarksHalf;
+          }
+          return false;
         });
       }
       if (plan.upsertPresentMark && !this.data.marks.some((m) => m.personId === personId && m.eventId === eventId)) {
@@ -465,13 +500,14 @@ export class MockApi implements ApiClient {
   }
 
   private ensureLateNotifications(event: EventDto) {
-    if (this.now().getTime() < Date.parse(event.cutoffAt)) return;
+    const cutoffAt = event.cutoffAt;
+    if (!cutoffAt || this.now().getTime() < Date.parse(cutoffAt)) return;
     const admin = this.data.users.find((u) => u.role === 'ADMIN')!;
     for (const unit of this.data.units) {
       const submitted = this.data.submissions.some((s) => s.unitId === unit.id && s.eventId === event.id);
       const already = this.data.notifications.some((n) => n.type === 'LATE' && n.unitId === unit.id && n.eventId === event.id);
       if (!submitted && !already) {
-        this.data.notifications.unshift({ id: this.newId('n'), userId: admin.id, type: 'LATE', unitId: unit.id, eventId: event.id, submissionId: null, message: `${unit.name} has not submitted ${event.label} · cut-off ${formatSgTime(event.cutoffAt)}`, createdAt: event.cutoffAt, readAt: null });
+        this.data.notifications.unshift({ id: this.newId('n'), userId: admin.id, type: 'LATE', unitId: unit.id, eventId: event.id, submissionId: null, message: `${unit.name} has not submitted ${event.label} · cut-off ${formatSgTime(cutoffAt)}`, createdAt: cutoffAt, readAt: null });
       }
     }
   }
@@ -479,13 +515,12 @@ export class MockApi implements ApiClient {
   absentees(eventId: string): Promise<AbsenteesDto> {
     return this.wait(() => {
       const event = this.eventById(eventId);
-      const order: AbsenceStatus[] = ['MC', 'LL', 'MA', 'RSI', 'OTHERS'];
-      const groups = order.map((status) => ({ status, items: [] as AbsenteesDto['groups'][number]['items'] }));
+      const groups = ABSENCE_STATUSES.map((status) => ({ status, items: [] as AbsenteesDto['groups'][number]['items'] }));
       for (const unit of this.data.units) {
         const { statuses } = this.computeUnit(unit.id, event);
         for (const s of statuses) {
           if (s.status === 'PRESENT' || s.status === 'UNMARKED') continue;
-          groups.find((g) => g.status === s.status)!.items.push({ personId: s.personId, rank: s.rank, name: s.name, unitId: unit.id, unitName: unit.name, status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark });
+          groups.find((g) => g.status === s.status)!.items.push({ personId: s.personId, rank: s.rank, name: s.name, unitId: unit.id, unitName: unit.name, status: s.status, subType: s.subType, halfDay: s.halfDay, startDate: s.startDate, endDate: s.endDate, remark: s.remark });
         }
       }
       const total = groups.reduce((n, g) => n + g.items.length, 0);
@@ -501,7 +536,7 @@ export class MockApi implements ApiClient {
     return this.wait(async () => {
       const abs = await this.absentees(eventId);
       const lines = [['Branch/Coy', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark'].join(',')];
-      for (const g of abs.groups) for (const i of g.items) lines.push([i.unitName, i.rank, i.name, i.status, i.subType ?? '', i.startDate ?? '', i.endDate ?? '', JSON.stringify(i.remark ?? '')].join(','));
+      for (const g of abs.groups) for (const i of g.items) lines.push([i.unitName, i.rank, i.name, statusLabel(i.status, i.halfDay), i.subType ?? '', i.startDate ?? '', i.endDate ?? '', JSON.stringify(i.remark ?? '')].join(','));
       return new Blob([`\uFEFF${lines.join('\r\n')}`], { type: format === 'csv' ? 'text/csv' : 'application/octet-stream' });
     });
   }

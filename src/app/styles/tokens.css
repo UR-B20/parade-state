@@ -36,6 +36,14 @@
   --rsi-tint: #f7ece9;
   --others: #637181;
   --others-tint: #eef1f4;
+  --off: #4f52b8;
+  --off-tint: #ebecf8;
+  --rso: #9c3d84;
+  --rso-tint: #f6e9f2;
+  --hl: #7a2540;
+  --hl-tint: #f5e8ec;
+  --ol: #5f6f1d;
+  --ol-tint: #eff2e3;
   --unmarked: #8a96a8;
   --unmarked-tint: #eef1f5;
 
@@ -122,6 +130,14 @@
     --rsi-tint: #3a2119;
     --others: #9aa8b9;
     --others-tint: #1e2833;
+    --off: #9a9dff;
+    --off-tint: #22254a;
+    --rso: #e07ac6;
+    --rso-tint: #3a1f33;
+    --hl: #e0809a;
+    --hl-tint: #3a1c26;
+    --ol: #b5c95a;
+    --ol-tint: #2a3018;
     --unmarked: #7a889b;
     --unmarked-tint: #1b2530;
     --ok: #4fc27a;
@@ -165,6 +181,14 @@
   --rsi-tint: #3a2119;
   --others: #9aa8b9;
   --others-tint: #1e2833;
+  --off: #9a9dff;
+  --off-tint: #22254a;
+  --rso: #e07ac6;
+  --rso-tint: #3a1f33;
+  --hl: #e0809a;
+  --hl-tint: #3a1c26;
+  --ol: #b5c95a;
+  --ol-tint: #2a3018;
   --unmarked: #7a889b;
   --unmarked-tint: #1b2530;
   --ok: #4fc27a;

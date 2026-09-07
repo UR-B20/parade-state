@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, formatSgDateLong, formatSgDateShort, type IsoDate } from '@shared/dates';
-import { ABSENCE_STATUSES, isMultiDay, OTHERS_SUB_TYPES, STATUS_LABEL, STATUS_LONG_LABEL, SUB_TYPE_LABEL, type AbsenceStatus, type OthersSubType } from '@shared/statuses';
+import { ABSENCE_STATUSES, HALF_DAY_HOURS, HALF_DAYS, isMultiDay, isSingleDay, OTHERS_SUB_TYPES, STATUS_LABEL, STATUS_LONG_LABEL, SUB_TYPE_LABEL, supportsHalfDay, type AbsenceStatus, type HalfDay, type OthersSubType } from '@shared/statuses';
 import type { EffectiveStatus, MarkBody } from '@shared/types';
 import { Button } from './Button';
 import { Icon } from './Icon';
@@ -27,6 +27,8 @@ interface Draft {
   /** Absence reason; null until one is picked. */
   status: AbsenceStatus | null;
   subType: OthersSubType | null;
+  /** Half-day LL or OFF; null for a full day. */
+  halfDay: HalfDay | null;
   startDate: IsoDate;
   endDate: IsoDate;
   openEnded: boolean;
@@ -39,6 +41,7 @@ function draftFor(person: EffectiveStatus, eventDate: IsoDate, startNotPresent: 
     choice: absent || startNotPresent ? 'NOT_PRESENT' : person.status === 'PRESENT' ? 'PRESENT' : startNotPresent ? 'NOT_PRESENT' : 'PRESENT',
     status: absent ? (person.status as AbsenceStatus) : null,
     subType: person.subType,
+    halfDay: absent ? person.halfDay : null,
     startDate: absent && person.startDate ? person.startDate : eventDate,
     endDate: absent && person.endDate ? person.endDate : eventDate,
     openEnded: absent && person.startDate !== null && person.endDate === null,
@@ -71,7 +74,7 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
     if (draft.choice === 'PRESENT') return null;
     if (!draft.status) return { field: 'status', message: 'Choose why they are not present' };
     if (draft.status === 'OTHERS' && !draft.subType) return { field: 'subType', message: 'Choose a type for Others' };
-    if (isMultiDay(draft.status)) {
+    if (isMultiDay(draft.status) && !draft.halfDay) {
       if (draft.startDate > eventDate) return { field: 'startDate', message: 'Start date cannot be after the parade date' };
       if (!draft.openEnded && draft.endDate < draft.startDate) return { field: 'endDate', message: 'End date must be on or after the start date' };
       if (!draft.openEnded && draft.endDate < eventDate) return { field: 'endDate', message: 'End date cannot be before the parade date' };
@@ -91,13 +94,13 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
   const pickStatus = (status: AbsenceStatus) => {
     if (!draft) return;
     const patch: Partial<Draft> = { status, choice: 'NOT_PRESENT' };
-    if (status === 'RSI') {
+    if (isSingleDay(status)) {
       patch.startDate = eventDate;
       patch.endDate = eventDate;
       patch.openEnded = false;
-    } else if (status !== 'OTHERS') {
-      patch.subType = null;
     }
+    if (status !== 'OTHERS') patch.subType = null;
+    if (!supportsHalfDay(status)) patch.halfDay = null;
     if (person.status === 'PRESENT' || person.status === 'UNMARKED') {
       // Fresh absence: default to a span starting today, ending today, so the user chooses the end.
       patch.startDate = eventDate;
@@ -116,17 +119,21 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
       onSave({ action: 'PRESENT' });
       return;
     }
+    const halfDay = supportsHalfDay(draft.status) ? draft.halfDay : null;
+    const pinned = isSingleDay(draft.status) || halfDay !== null;
     onSave({
       action: 'SET',
       status: draft.status,
       subType: draft.status === 'OTHERS' ? draft.subType : null,
-      startDate: draft.status === 'RSI' ? eventDate : draft.startDate,
-      endDate: draft.status === 'RSI' ? eventDate : draft.openEnded ? null : draft.endDate,
+      halfDay,
+      startDate: pinned ? eventDate : draft.startDate,
+      endDate: pinned ? eventDate : draft.openEnded ? null : draft.endDate,
       remark: draft.remark.trim() || null,
     });
   };
 
-  const showDates = !!draft && draft.choice === 'NOT_PRESENT' && !!draft.status && isMultiDay(draft.status);
+  const showHalfDay = !!draft && draft.choice === 'NOT_PRESENT' && !!draft.status && supportsHalfDay(draft.status);
+  const showDates = !!draft && draft.choice === 'NOT_PRESENT' && !!draft.status && isMultiDay(draft.status) && !draft.halfDay;
   const currentUnmarked = person.status === 'UNMARKED';
 
   return (
@@ -145,7 +152,7 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
           </h2>
           <div className="sheet-current dialog__subtitle">
             Now
-            <StatusPill status={person.status} />
+            <StatusPill status={person.status} halfDay={person.halfDay} />
             <span>{currentUnmarked ? `for ${eventLabel}` : person.status === 'PRESENT' ? `for ${eventLabel}` : describeStatus(person, eventDate).replace(/^[^·]+· /, '')}</span>
           </div>
         </div>
@@ -198,6 +205,23 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
                 ))}
               </div>
               {error?.field === 'subType' && <span className="field__error" role="alert">{error.message}</span>}
+            </div>
+          )}
+
+          {showHalfDay && (
+            <div className="field">
+              <span className="field__label" id="halfday-label">Duration</span>
+              <div className="halfday-grid" role="group" aria-labelledby="halfday-label">
+                <button type="button" className="subtype-opt" aria-pressed={draft.halfDay === null} onClick={() => update({ halfDay: null })}>
+                  Full day
+                </button>
+                {HALF_DAYS.map((h) => (
+                  <button key={h} type="button" className="subtype-opt" aria-pressed={draft.halfDay === h} onClick={() => update({ halfDay: h, startDate: eventDate, endDate: eventDate, openEnded: false })}>
+                    {h}
+                    <small className="num">{HALF_DAY_HOURS[h]}</small>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -257,11 +281,21 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
             </>
           )}
 
-          {draft.choice === 'NOT_PRESENT' && draft.status === 'RSI' && (
+          {draft.choice === 'NOT_PRESENT' && draft.status && isSingleDay(draft.status) && (
             <div className="sheet-note">
               <Icon name="info" size={18} />
               <span>
-                <strong>RSI applies to {formatSgDateLong(eventDate)} only.</strong> If the person is later given an MC, mark MC with its dates.
+                <strong>{STATUS_LABEL[draft.status]} applies to {formatSgDateLong(eventDate)} only.</strong> If the person is later given an MC, mark MC with its dates.
+              </span>
+            </div>
+          )}
+
+          {draft.choice === 'NOT_PRESENT' && draft.status && draft.halfDay && supportsHalfDay(draft.status) && (
+            <div className="sheet-note">
+              <Icon name="info" size={18} />
+              <span>
+                <strong>{STATUS_LABEL[draft.status]} for the {draft.halfDay} half of {formatSgDateLong(eventDate)} only ({HALF_DAY_HOURS[draft.halfDay]}).</strong>{' '}
+                They are expected at the {draft.halfDay === 'AM' ? 'PM' : 'AM'} parade and stay Not yet marked there until you mark them.
               </span>
             </div>
           )}
@@ -271,7 +305,7 @@ export function StatusSheet({ person, eventDate, eventLabel, startNotPresent = f
               <Icon name="info" size={18} />
               <span>
                 <strong>Present marks {eventLabel} only.</strong> The {STATUS_LABEL[person.status]} still runs
-                {person.endDate ? ` until ${formatSgDateShort(person.endDate, eventDate)}` : ' with no end date'}. Use <strong>Back to Present</strong> to end it from today.
+                {person.halfDay ? ` for the ${person.halfDay} half of today` : person.endDate ? ` until ${formatSgDateShort(person.endDate, eventDate)}` : ' with no end date'}. Use <strong>Back to Present</strong> to end it from today.
               </span>
             </div>
           )}

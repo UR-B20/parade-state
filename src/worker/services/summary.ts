@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { awaitingRank, contentHash, deriveSubmissionState, effectiveStatuses, platoonBreakdown, sumCounts, unitCounts } from '@shared/domain';
+import { awaitingRank, contentHash, deriveSubmissionState, effectiveStatuses, eventHalf, platoonBreakdown, sumCounts, unitCounts } from '@shared/domain';
 import type { AbsenteeDto, AbsenteesDto, BattalionSummaryDto, EffectiveStatus, UnitSummaryRow } from '@shared/types';
 import { ABSENCE_STATUSES } from '@shared/statuses';
 import type { Db } from '../db/client';
@@ -32,19 +32,20 @@ export async function unitRows(db: Db, event: EventRow, now: Date): Promise<{ ro
     if (!cur || s.version > cur.version) latestByUnit.set(s.unitId, s);
   }
   const activityByUnit = new Map(activity.map((a) => [a.unitId, a]));
+  const half = eventHalf(event);
   return Promise.all(
     units.map(async (u) => {
       const unitPeople = people.filter((p) => p.unitId === u.id && p.postedInDate <= event.date && (p.postedOutDate === null || p.postedOutDate > event.date));
       const unitSpans = spans.filter((s) => s.unitId === u.id).map(toSpanRow);
       const unitMarks = new Set(marks.filter((m) => m.unitId === u.id).map((m) => m.personId));
-      const statuses = effectiveStatuses(unitPeople, unitSpans, unitMarks, event.date);
+      const statuses = effectiveStatuses(unitPeople, unitSpans, unitMarks, event.date, half);
       const hash = await contentHash(statuses);
       const latest = latestByUnit.get(u.id);
       const act = activityByUnit.get(u.id);
       const state = deriveSubmissionState({
         latest: latest ? { version: latest.version, submittedAt: latest.submittedAt.toISOString(), submittedBy: latest.submittedBy, contentHash: latest.contentHash } : null,
         activity: act ? { lastChangedAt: act.lastChangedAt.toISOString() } : null,
-        cutoffAt: event.cutoffAt.toISOString(),
+        cutoffAt: event.cutoffAt?.toISOString() ?? null,
         now,
         currentHash: hash,
       });
@@ -71,7 +72,7 @@ export async function absentees(db: Db, env: Bindings, event: EventRow, realNow:
       if (s.status === 'PRESENT' || s.status === 'UNMARKED') continue;
       groups.find((g) => g.status === s.status)!.items.push({
         personId: s.personId, rank: s.rank, name: s.name, unitId: row.unit.id, unitName: row.unit.name,
-        status: s.status, subType: s.subType, startDate: s.startDate, endDate: s.endDate, remark: s.remark,
+        status: s.status, subType: s.subType, halfDay: s.halfDay, startDate: s.startDate, endDate: s.endDate, remark: s.remark,
       });
     }
   }

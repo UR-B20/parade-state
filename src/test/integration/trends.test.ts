@@ -38,7 +38,7 @@ describe('battalion trends', () => {
     // Tue 1 Sep is the report-sick spike.
     const tue = body.days.find((d) => d.date === '2026-09-01')!;
     expect(tue.counts.rsi).toBeGreaterThan(15);
-    expect(body.othersSubTypes).toEqual({ ATTACHED_OUT: 1, COURSE: 1, OUTFIELD: 0, DUTY: 2 });
+    expect(body.othersSubTypes).toEqual({ VOC: 0, SOC: 1, ATP_CS: 1, MEETING: 0, COURSE: 1, DUTY: 0, STAY_OUT: 1, ATTACHED_OUT: 0, OUTFIELD: 0 });
   });
 
   it('scores reporting discipline per unit over the window', async () => {

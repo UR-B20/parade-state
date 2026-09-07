@@ -2,11 +2,10 @@ import { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import type { ChartData, ChartOptions } from 'chart.js';
 import { ABSENCE_STATUSES, STATUS_LABEL, STATUS_LONG_LABEL, SUB_TYPE_LABEL, OTHERS_SUB_TYPES, type AbsenceStatus } from '@shared/statuses';
-import type { TrendsDto, UnitCounts } from '@shared/types';
+import type { TrendsDto } from '@shared/types';
+import { STATUS_COUNT_KEY as KEY } from '@shared/domain';
 import { ink, ink3, lineStrong, STATUS_COLOR } from '../../../charts/theme';
 import { ChartCard, DataTable, LegendRow } from './ChartCard';
-
-const KEY: Record<AbsenceStatus, keyof UnitCounts> = { MC: 'mc', LL: 'll', MA: 'ma', RSI: 'rsi', OTHERS: 'others' };
 
 export function AbsenceReasons({ trends }: { trends: TrendsDto }) {
   const today = trends.days[trends.days.length - 1]!;

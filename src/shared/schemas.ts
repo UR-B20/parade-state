@@ -1,7 +1,7 @@
 /** Request body schemas shared by the Worker (validation) and the client (forms). */
 import * as v from 'valibot';
 import { isClockTime, isIsoDate } from './dates';
-import { ABSENCE_STATUSES, OTHERS_SUB_TYPES } from './statuses';
+import { ABSENCE_STATUSES, HALF_DAYS, OTHERS_SUB_TYPES } from './statuses';
 import { RANK_ORDER } from './ranks';
 
 export const IsoDateSchema = v.pipe(v.string(), v.check(isIsoDate, 'Enter a valid date'));
@@ -29,6 +29,7 @@ export const MarkBodySchema = v.variant('action', [
     action: v.literal('SET'),
     status: v.picklist(ABSENCE_STATUSES),
     subType: v.nullish(v.picklist(OTHERS_SUB_TYPES)),
+    halfDay: v.nullish(v.picklist(HALF_DAYS)),
     startDate: IsoDateSchema,
     endDate: v.nullable(IsoDateSchema),
     remark: RemarkSchema,

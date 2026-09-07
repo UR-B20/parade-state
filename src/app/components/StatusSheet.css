@@ -74,6 +74,37 @@
 .status-opt--MA { --opt: var(--ma); --opt-tint: var(--ma-tint); }
 .status-opt--RSI { --opt: var(--rsi); --opt-tint: var(--rsi-tint); }
 .status-opt--OTHERS { --opt: var(--others); --opt-tint: var(--others-tint); }
+.status-opt--OFF { --opt: var(--off); --opt-tint: var(--off-tint); }
+.status-opt--RSO { --opt: var(--rso); --opt-tint: var(--rso-tint); }
+.status-opt--HL { --opt: var(--hl); --opt-tint: var(--hl-tint); }
+.status-opt--OL { --opt: var(--ol); --opt-tint: var(--ol-tint); }
+
+/* Full day / AM / PM for LL and OFF */
+.halfday-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.halfday-grid .subtype-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 6px 4px;
+  line-height: 1.2;
+}
+
+.halfday-grid .subtype-opt small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.halfday-grid .subtype-opt[aria-pressed='true'] small {
+  color: inherit;
+}
 
 .subtype-grid {
   display: grid;

@@ -20,4 +20,4 @@ export function createPersister() {
 }
 
 /** Bump when persisted shapes change so stale caches are discarded. */
-export const PERSIST_BUSTER = 'v1';
+export const PERSIST_BUSTER = 'v2';

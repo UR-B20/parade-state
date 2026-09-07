@@ -25,7 +25,8 @@ export async function notifyAdmins(db: Db, input: { type: NotificationType; unit
  * admin. Idempotent through the partial unique index, so the dashboard and the cron can both call it.
  */
 export async function ensureLateNotifications(db: Db, event: EventRow, now: Date): Promise<number> {
-  if (now.getTime() < event.cutoffAt.getTime()) return 0;
+  const cutoffAt = event.cutoffAt;
+  if (!cutoffAt || now.getTime() < cutoffAt.getTime()) return 0;
   const [allUnits, submitted, admins] = await Promise.all([
     db.select().from(units),
     db.selectDistinct({ unitId: submissions.unitId }).from(submissions).where(eq(submissions.eventId, event.id)),
@@ -38,8 +39,8 @@ export async function ensureLateNotifications(db: Db, event: EventRow, now: Date
   const rows = late.flatMap((u) =>
     admins.map((userId) => ({
       userId, type: 'LATE' as const, unitId: u.id, eventId: event.id, submissionId: null,
-      message: `${u.name} has not submitted ${label} · cut-off ${formatSgTime(event.cutoffAt)}`,
-      createdAt: event.cutoffAt,
+      message: `${u.name} has not submitted ${label} · cut-off ${formatSgTime(cutoffAt)}`,
+      createdAt: cutoffAt,
     })),
   );
   const inserted = await db
