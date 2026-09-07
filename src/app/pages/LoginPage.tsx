@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import * as v from 'valibot';
@@ -12,8 +12,8 @@ import { useDemoAccounts, useMe } from '../api/queries';
 import { useConfig } from '../state/config';
 import { Button } from '../components/Button';
 import { Icon } from '../components/Icon';
-import banner from '../brand/soldiertrack-banner.svg';
-import lockup from '../brand/soldiertrack-lockup.svg';
+import badge from '../brand/soldiertrack-badge.svg';
+import wordmark from '../brand/soldiertrack-wordmark.svg';
 import sleeve from '../brand/sleeve.jpg';
 import '../components/Dialog.css';
 import './LoginPage.css';
@@ -24,26 +24,15 @@ export function LoginPage() {
   return <SignInPage />;
 }
 
-function useWide(): boolean {
-  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 900px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 900px)');
-    const onChange = () => setWide(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return wide;
-}
-
-/** Full-bleed camo photo, the white lockup on a dark band, and the card beside it. */
+/** Full-bleed camo photo, the badge over the wordmark on a dark band, and the card beside it. */
 function Scene({ children }: { children: ReactNode }) {
-  const wide = useWide();
   return (
     <div className="login-scene">
       <img className="login-scene__bg" src={sleeve} alt="" draggable={false} />
       <div className="login-scene__band">
-        <div className="login-scene__lockup">
-          <img src={wide ? banner : lockup} alt="SoldierTrack, Personnel Tracking System. Because every soldier counts." draggable={false} />
+        <div className="login-scene__lockup" role="img" aria-label="SoldierTrack, Personnel Tracking System. Because every soldier counts.">
+          <img className="login-scene__badge" src={badge} alt="" draggable={false} />
+          <img className="login-scene__wordmark" src={wordmark} alt="" draggable={false} />
         </div>
         <div className="login-scene__side">{children}</div>
       </div>

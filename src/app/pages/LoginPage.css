@@ -33,13 +33,23 @@
 }
 
 .login-scene__lockup {
-  width: min(92%, 400px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
 }
 
-.login-scene__lockup img {
+.login-scene__badge {
   display: block;
-  width: 100%;
+  width: min(72%, 270px);
+  height: auto;
+}
+
+.login-scene__wordmark {
+  display: block;
+  width: min(92%, 340px);
   height: auto;
 }
 
@@ -140,7 +150,16 @@
   }
 
   .login-scene__lockup {
-    width: min(60vw, 860px);
+    flex: 1;
+    gap: 28px;
+  }
+
+  .login-scene__badge {
+    width: min(30vw, 420px);
+  }
+
+  .login-scene__wordmark {
+    width: min(42vw, 620px);
   }
 
   .login-scene__side {
