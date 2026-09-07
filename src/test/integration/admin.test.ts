@@ -21,12 +21,12 @@ beforeAll(async () => {
 afterAll(async () => { await h.close(); });
 
 describe('battalion summary on the demo battalion', () => {
-  it('shows the battalion at 09:24: 263 / 312 marked present, 24 not yet marked, 25 absent, 6 of 8 submitted', async () => {
+  it('shows the battalion at 09:24: 269 / 318 marked present, 24 not yet marked, 25 absent, 7 of 9 submitted', async () => {
     const { status, body } = await h.json<BattalionSummaryDto>(`/admin/summary/${AM}`, { as: admin });
     expect(status).toBe(200);
-    expect(body.totals).toMatchObject({ strength: 312, present: 263, unmarked: 24, absent: 25, mc: 9, ll: 5, ma: 4, rsi: 3, others: 4 });
-    expect(body.unitsSubmitted).toBe(6);
-    expect(body.unitsTotal).toBe(8);
+    expect(body.totals).toMatchObject({ strength: 318, present: 269, unmarked: 24, absent: 25, mc: 9, ll: 5, ma: 4, rsi: 3, others: 4 });
+    expect(body.unitsSubmitted).toBe(7);
+    expect(body.unitsTotal).toBe(9);
     expect(body.units.slice(0, 2).map((u) => [u.unit.name, u.submission.kind])).toEqual([['Coy 1', 'PENDING'], ['S2', 'NOT_MARKED']]);
     const ssp = body.units.find((u) => u.unit.name === 'SSP')!;
     expect(ssp.submission).toMatchObject({ kind: 'RESUBMITTED', version: 2, hasChanges: false });
@@ -81,7 +81,7 @@ describe('export', () => {
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]); // Response.text() would strip the BOM, so check bytes
     const text = new TextDecoder().decode(bytes);
-    expect(text.startsWith('Unit,Rank,Name,Status,Sub-type,Start,End,Remark\r\n')).toBe(true);
+    expect(text.startsWith('Branch/Coy,Rank,Name,Status,Sub-type,Start,End,Remark\r\n')).toBe(true);
     const lines = text.trim().split('\r\n');
     expect(lines).toHaveLength(26);
     expect(lines.some((l) => l.includes('Coy 1,CPL,Daniel Tan,MC,,2026-09-05,2026-09-08,"Fever, Bedok Polyclinic"'))).toBe(true);
@@ -98,8 +98,8 @@ describe('export', () => {
     expect(workbook).toContain('name="Absentees"');
     const summary = strFromU8(files['xl/worksheets/sheet1.xml']!);
     expect(summary).toContain('<t xml:space="preserve">Coy 1</t>');
-    expect(summary).toContain('<c r="B13" s="1"><v>312</v></c>');
-    expect(summary).toContain('<v>263</v>');
+    expect(summary).toContain('<v>318</v>');
+    expect(summary).toContain('<v>269</v>');
     expect(summary).toContain('Unmarked');
     const abs = strFromU8(files['xl/worksheets/sheet2.xml']!);
     expect(abs).toContain('Daniel Tan');

@@ -65,7 +65,7 @@ export function RollPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
     return (rollQ.data ?? []).filter((p) => !q || `${p.rank} ${p.name}`.toLowerCase().includes(q));
   }, [rollQ.data, search]);
 
-  if (!unitId) return <EmptyState icon="alert" title="Your account has no unit" />;
+  if (!unitId) return <EmptyState icon="alert" title="Your account has no Branch/Coy" />;
 
   return (
     <div className="page page--column">

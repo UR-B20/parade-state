@@ -70,8 +70,8 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
   const headline = c.strength === 0
     ? 'No personnel on the roll yet.'
     : incomplete
-      ? `${today.unitsSubmitted} of ${today.unitsTotal} units have submitted: ${c.present} of ${c.strength} marked present, ${c.unmarked} still to mark. Of those marked, ${pct(markedRate)} are present.${vsAvg}`
-      : `All ${today.unitsTotal} units have submitted: ${pct(presentRate)} present (${c.present} of ${c.strength}), ${c.absent} absent.${vsAvg}`;
+      ? `${today.unitsSubmitted} of ${today.unitsTotal} Branches/Coy have submitted: ${c.present} of ${c.strength} marked present, ${c.unmarked} still to mark. Of those marked, ${pct(markedRate)} are present.${vsAvg}`
+      : `All ${today.unitsTotal} Branches/Coy have submitted: ${pct(presentRate)} present (${c.present} of ${c.strength}), ${c.absent} absent.${vsAvg}`;
 
   const items: Insight[] = [];
 
@@ -82,7 +82,7 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
     items.push({
       tone: pastCutoff ? 'danger' : 'warn',
       text: pastCutoff
-        ? `Past the cut-off with ${awaiting.length === 1 ? 'one unit' : `${awaiting.length} units`} still out: ${awaiting.join(', ')}.`
+        ? `Past the cut-off with ${awaiting.length === 1 ? 'one Branch/Coy' : `${awaiting.length} Branches/Coy`} still out: ${awaiting.join(', ')}.`
         : `Awaiting ${awaiting.join(', ')}${c.unmarked > 0 ? ` (${c.unmarked} personnel not yet marked)` : ''}.`,
     });
   }
@@ -107,9 +107,9 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
       .sort((a, b) => a.rate - b.rate);
     const lowest = fully[0];
     if (lowest && markedRate - lowest.rate >= 0.04) {
-      items.push({ tone: 'warn', text: `${lowest.name} is the weakest unit at ${pct(lowest.rate)} present (${lowest.counts.present} of ${lowest.counts.strength}), ${Math.round((markedRate - lowest.rate) * 100)} points below the battalion.` });
+      items.push({ tone: 'warn', text: `${lowest.name} is the weakest Branch/Coy at ${pct(lowest.rate)} present (${lowest.counts.present} of ${lowest.counts.strength}), ${Math.round((markedRate - lowest.rate) * 100)} points below the battalion.` });
     } else if (fully.length >= 2) {
-      items.push({ tone: 'ok', text: `No unit is more than 4 points below the battalion rate (lowest ${lowest!.name} at ${pct(lowest!.rate)}).` });
+      items.push({ tone: 'ok', text: `No Branch/Coy is more than 4 points below the battalion rate (lowest ${lowest!.name} at ${pct(lowest!.rate)}).` });
     }
   }
 
@@ -136,7 +136,7 @@ export function buildBriefing(t: TrendsDto, summary?: Pick<BattalionSummaryDto, 
         text: `${slow.map((u) => `${u.unitName} (${u.late} late, ${u.missed} missed)`).join(', ')} over the last ${recorded} parades.`,
       });
     } else {
-      items.push({ tone: 'ok', text: `Every unit submitted on time over the last ${recorded} parades, at most one slip each.` });
+      items.push({ tone: 'ok', text: `Every Branch/Coy submitted on time over the last ${recorded} parades, at most one slip each.` });
     }
   }
 

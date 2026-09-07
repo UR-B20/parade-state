@@ -55,12 +55,17 @@ export function ensureCharts(): void {
   Chart.register(ArcElement, BarController, BarElement, CategoryScale, DoughnutController, Filler, Legend, LineController, LineElement, LinearScale, PointElement, Tooltip);
   Chart.defaults.font.family = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
   Chart.defaults.font.size = 12;
-  Chart.defaults.color = ink2();
-  Chart.defaults.borderColor = line();
-  Chart.defaults.animation = prefersReducedMotion() ? false : { duration: 320, easing: 'easeOutQuart' };
+  Chart.defaults.animation = prefersReducedMotion() ? false : { duration: 320 };
   Chart.defaults.plugins.legend.display = false;
   Chart.defaults.maintainAspectRatio = false;
   Chart.defaults.responsive = true;
+  applyChartTheme();
+}
+
+/** Re-reads the CSS tokens (light or dark) into Chart.js defaults. Call after the theme changes. */
+export function applyChartTheme(): void {
+  Chart.defaults.color = ink2();
+  Chart.defaults.borderColor = line();
   Object.assign(Chart.defaults.plugins.tooltip, {
     backgroundColor: surface(),
     titleColor: ink(),

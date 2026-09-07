@@ -20,9 +20,9 @@ beforeAll(async () => { t = await createTestDb(); });
 afterAll(async () => { await t.close(); });
 
 describe('schema and migrations', () => {
-  it('applies all migrations and seeds the eight units', async () => {
+  it('applies all migrations and seeds the nine units', async () => {
     const units = await t.raw.select().from(schema.units).orderBy(schema.units.sortOrder);
-    expect(units.map((u) => u.name)).toEqual(['S1', 'S2', 'S3', 'S4', 'SSP', 'Coy 1', 'Coy 2', 'ISR Coy']);
+    expect(units.map((u) => u.name)).toEqual(['CO Office', 'S1', 'S2', 'S3', 'S4', 'SSP', 'Coy 1', 'Coy 2', 'ISR Coy']);
     const settings = await t.raw.select().from(schema.appSettings);
     expect(Object.fromEntries(settings.map((s) => [s.key, s.value]))).toEqual({ cutoff_am: '10:00', cutoff_pm: '14:00' });
   });
@@ -58,7 +58,7 @@ describe('schema and migrations', () => {
 
   it('keeps the Late notification unique per admin, unit and event', async () => {
     const admin = '00000000-0000-4000-8000-0000000000aa';
-    await t.raw.insert(schema.profiles).values({ id: admin, email: 'a@x', displayName: 'A', role: 'ADMIN' });
+    await t.raw.insert(schema.profiles).values({ id: admin, username: 'a', email: 'a@x', displayName: 'A', role: 'ADMIN' });
     const row = { userId: admin, type: 'LATE' as const, unitId: 'S2', eventId: '2026-09-06-AM', message: 'late' };
     await t.raw.insert(schema.notifications).values(row);
     await expect(t.raw.insert(schema.notifications).values(row)).rejects.toThrow();

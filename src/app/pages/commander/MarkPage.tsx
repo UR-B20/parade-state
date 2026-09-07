@@ -160,7 +160,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
   const onSubmit = async () => {
     try {
       const sub = await submit.mutateAsync();
-      toast.show(`${sub.version > 1 ? `Resubmitted v${sub.version}` : 'Submitted'} to S1 at ${formatSgTime(sub.submittedAt)}`);
+      toast.show(`${sub.version > 1 ? `Resubmitted v${sub.version}` : 'Submitted'} to S1 Branch at ${formatSgTime(sub.submittedAt)}`);
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Couldn't submit. Check your connection and try again.", { tone: 'error' });
       throw err;
@@ -175,7 +175,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
       <div className="page">
         <AppHeader title="No unit assigned" />
         <div className="page__content">
-          <EmptyState icon="alert" title="Your account has no unit" text="Ask S1 to assign you to a unit before marking attendance." />
+          <EmptyState icon="alert" title="Your account has no Branch/Coy" text="Ask S1 Branch to assign you to a Branch/Coy before marking attendance." />
         </div>
       </div>
     );
@@ -231,7 +231,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
             cutoff={cutoff}
             note={
               scopeLabel
-                ? `${scopeLabel} · ${scopeCounts.unmarked > 0 ? `${scopeCounts.unmarked} not yet marked` : 'everyone marked'} · unit total ${data.counts.present} / ${data.counts.strength}`
+                ? `${scopeLabel} · ${scopeCounts.unmarked > 0 ? `${scopeCounts.unmarked} not yet marked` : 'everyone marked'} · Coy total ${data.counts.present} / ${data.counts.strength}`
                 : data.counts.unmarked > 0
                   ? `${data.counts.unmarked} not yet marked. Tap Present or Not present on each row.`
                   : 'Everyone is marked.'

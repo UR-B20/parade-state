@@ -35,6 +35,7 @@ export const DEMO_PLATOONS: PlatoonDto[] = [
 const platoonsOf = (unitId: UnitId) => DEMO_PLATOONS.filter((p) => p.unitId === unitId);
 
 export const DEMO_UNITS: UnitDto[] = [
+  { id: 'CO', name: 'CO Office', sortOrder: 0, platoons: [] },
   { id: 'S1', name: 'S1', sortOrder: 1, platoons: [] },
   { id: 'S2', name: 'S2', sortOrder: 2, platoons: [] },
   { id: 'S3', name: 'S3', sortOrder: 3, platoons: [] },
@@ -57,6 +58,7 @@ interface UnitSpec {
 }
 
 const UNIT_SPECS: UnitSpec[] = [
+  { id: 'CO', strength: 6, mc: 0, ll: 0, ma: 0, rsi: 0, others: 0, kind: 'staff' },
   { id: 'S1', strength: 12, mc: 1, ll: 1, ma: 0, rsi: 0, others: 0, kind: 'staff' },
   { id: 'S2', strength: 14, mc: 0, ll: 0, ma: 0, rsi: 0, others: 0, kind: 'staff' },
   { id: 'S3', strength: 16, mc: 1, ll: 0, ma: 0, rsi: 0, others: 0, kind: 'staff' },
@@ -69,6 +71,7 @@ const UNIT_SPECS: UnitSpec[] = [
 
 export interface DemoUser {
   id: string;
+  username: string;
   email: string;
   displayName: string;
   role: Role;
@@ -198,12 +201,13 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
   const usedNames = new Set<string>();
 
   const users: DemoUser[] = [
-    { id: rng.uuid(), email: `s1admin@${DEMO_EMAIL_DOMAIN}`, displayName: 'CPT Ong Li Ting', role: 'ADMIN', unitId: null },
+    { id: rng.uuid(), username: 's1admin', email: `s1admin@${DEMO_EMAIL_DOMAIN}`, displayName: 'CPT Ong Li Ting', role: 'ADMIN', unitId: null },
   ];
   const commanderFor = new Map<UnitId, DemoUser>();
   for (const u of DEMO_UNITS) {
     const user: DemoUser = {
       id: rng.uuid(),
+      username: `cdr.${u.id.toLowerCase()}`,
       email: `cdr.${u.id.toLowerCase()}@${DEMO_EMAIL_DOMAIN}`,
       displayName: `${u.name} commander`,
       role: 'COMMANDER',
@@ -307,7 +311,9 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
       const key = f.absence.status.toLowerCase() as keyof typeof remaining;
       remaining[key] -= 1;
     }
-    const candidates = rng.shuffle(unitPeople.filter((p) => !absentIds.has(p.id) && ['PTE', 'LCP', 'CPL', 'CFC', '3SG'].includes(p.rank)));
+    // The brief's example rows keep the statuses the brief gives them; random absences skip them.
+    const fixedNameSet = new Set(fixed.map((f) => f.name));
+    const candidates = rng.shuffle(unitPeople.filter((p) => !absentIds.has(p.id) && !fixedNameSet.has(p.name) && ['PTE', 'LCP', 'CPL', 'CFC', '3SG'].includes(p.rank)));
     let ci = 0;
     const take = () => { const p = candidates[ci++]; if (!p) throw new Error(`not enough candidates in ${spec.id}`); return p; };
     for (let i = 0; i < remaining.mc; i++) addSpan(take(), 'MC', null, addDays(date, -rng.int(0, 2)), addDays(date, rng.int(1, 3)), rng.pick(['Fever, Bedok Polyclinic', 'URTI, medical centre', 'Gastroenteritis, CGH', 'Flu, Tampines Polyclinic']));
@@ -334,7 +340,7 @@ export async function buildDemoDataset(): Promise<DemoDataset> {
 
   // Submission and activity states at 09:24.
   const submitTimes: Partial<Record<UnitId, string[]>> = {
-    S1: ['08:22'], S3: ['08:31'], S4: ['08:45'], SSP: ['08:40', '09:10'], COY2: ['09:02'], ISR: ['08:58'],
+    CO: ['08:15'], S1: ['08:22'], S3: ['08:31'], S4: ['08:45'], SSP: ['08:40', '09:10'], COY2: ['09:02'], ISR: ['08:58'],
   };
   const notifyAdmins = (type: NotificationType, unit: UnitDto, submissionId: string | null, message: string, at: IsoTimestamp, read: boolean) => {
     notifications.push({ id: rng.uuid(), userId: admin.id, type, unitId: unit.id, eventId: am.id, submissionId, message, createdAt: at, readAt: read ? at : null });

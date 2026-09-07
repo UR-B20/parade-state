@@ -55,7 +55,7 @@ describe('buildBriefing', () => {
   it('leads with the reporting gap while marking is incomplete and names the slow unit', () => {
     const t = buildTrends(input());
     const b = buildBriefing(t, { units: input().today.units });
-    expect(b.headline).toBe('1 of 2 units have submitted: 75 of 100 marked present, 20 still to mark. Of those marked, 94% are present. That is in line with the 7-day average of 93%.');
+    expect(b.headline).toBe('1 of 2 Branches/Coy have submitted: 75 of 100 marked present, 20 still to mark. Of those marked, 94% are present. That is in line with the 7-day average of 93%.');
     expect(b.markedRate).toBeCloseTo(0.9375);
     expect(b.avg7).toBeCloseTo((6 * 0.93 + 0.94) / 7, 3);
     const texts = b.items.map((i) => i.text);
@@ -69,11 +69,11 @@ describe('buildBriefing', () => {
     const rowB: UnitSummaryRow = { ...base.today.units[1]!, counts: counts(50, 48, { ll: 2 }), submission: { kind: 'SUBMITTED', version: 1, submittedAt: '2026-09-06T01:50:00.000Z', submittedBy: 'y', wasLate: false, hasChanges: false } };
     const complete = input({ today: { units: [base.today.units[0]!, rowB], totals: counts(100, 93, { mc: 5, ll: 2 }), unitsSubmitted: 2, unitsTotal: 2 } });
     const b = buildBriefing(buildTrends(complete), { units: complete.today.units });
-    expect(b.headline.startsWith('All 2 units have submitted: 93% present (93 of 100), 7 absent.')).toBe(true);
+    expect(b.headline.startsWith('All 2 Branches/Coy have submitted: 93% present (93 of 100), 7 absent.')).toBe(true);
     expect(b.items.some((i) => i.text.startsWith('Awaiting'))).toBe(false);
 
     const late = input({ serverNow: '2026-09-06T02:30:00.000Z' });
     const lb = buildBriefing(buildTrends(late), { units: late.today.units });
-    expect(lb.items[0]).toMatchObject({ tone: 'danger', text: 'Past the cut-off with one unit still out: Bravo.' });
+    expect(lb.items[0]).toMatchObject({ tone: 'danger', text: 'Past the cut-off with one Branch/Coy still out: Bravo.' });
   });
 });

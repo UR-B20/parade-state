@@ -42,10 +42,10 @@ export function ChangePasswordPage() {
 
   return (
     <div className="page page--column">
-      <AppHeader title="Change password" meta={me.user.email} />
+      <AppHeader title="Change password" meta={me.user.username} />
       <main className="page__content">
         {me.user.mustChangePassword && (
-          <p className="dialog__text" style={{ padding: '4px 0' }}>Your password was set by S1. Choose a new one before you continue.</p>
+          <p className="dialog__text" style={{ padding: '4px 0' }}>Your password was set by S1 Branch. Choose a new one before you continue.</p>
         )}
         <form className="roll" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }} onSubmit={submit} noValidate>
           <label className="field">

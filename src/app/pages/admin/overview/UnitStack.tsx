@@ -97,24 +97,24 @@ export function UnitStack({ summary }: { summary: BattalionSummaryDto }) {
   const height = 28 + rows.length * 34;
   return (
     <ChartCard
-      title={unitRow ? `${unitRow.unit.name} by platoon` : 'Present share by unit'}
-      subtitle={unitRow ? `${unitRow.counts.present} of ${unitRow.counts.strength} present · click a platoon's row in the roll for names` : 'Weakest first · click a company for its platoons'}
+      title={unitRow ? `${unitRow.unit.name} by platoon` : 'Present share by Branch/Coy'}
+      subtitle={unitRow ? `${unitRow.counts.present} of ${unitRow.counts.strength} present · click a platoon's row in the roll for names` : 'Weakest first · click a Coy for its platoons'}
       action={
         drillable.length > 0 && (
           <label className="text-xs text-ink-2">
             <span className="sr-only">Drill into</span>
             <select className="field__input min-h-9 py-0 text-xs" value={drill} onChange={(e) => setDrill(e.target.value)} aria-label="Drill into a company">
-              <option value="">Battalion</option>
+              <option value="">15C4I Battalion</option>
               {drillable.map((u) => <option key={u.unit.id} value={u.unit.id}>{u.unit.name}</option>)}
             </select>
           </label>
         )
       }
-      table={<DataTable caption="Present share" head={['Unit', 'Strength', 'Present', 'Share', 'Absent', 'Unmarked']} rows={rows.map((r) => [r.name, r.counts.strength, r.counts.present, pct(rateOf(r.counts)), r.counts.absent, r.counts.unmarked])} />}
+      table={<DataTable caption="Present share" head={['Branch/Coy', 'Strength', 'Present', 'Share', 'Absent', 'Unmarked']} rows={rows.map((r) => [r.name, r.counts.strength, r.counts.present, pct(rateOf(r.counts)), r.counts.absent, r.counts.unmarked])} />}
       footer={<LegendRow items={KINDS.map((k) => ({ label: labelFor(k), color: STATUS_COLOR[k]!() }))} />}
     >
       <div style={{ height }} className="w-full">
-        <Bar data={data} options={{ ...options, plugins: { ...options.plugins, endLabels: { labels } } }} plugins={[endLabels]} key={drill} aria-label="Present share by unit" role="img" />
+        <Bar data={data} options={{ ...options, plugins: { ...options.plugins, endLabels: { labels } } }} plugins={[endLabels]} key={drill} aria-label="Present share by Branch/Coy" role="img" />
       </div>
     </ChartCard>
   );

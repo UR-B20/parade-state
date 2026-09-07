@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { sgDateOf } from '@shared/dates';
 import type { MeDto } from '@shared/types';
-import { BootstrapSchema } from '@shared/schemas';
+import { BootstrapSchema, LoginSchema } from '@shared/schemas';
 import { DEMO_EMAIL_DOMAIN } from '@shared/demo/dataset';
 import { requireAuth, type AppEnv } from '../auth/middleware';
 import { demoControlsEnabled } from '../env';
 import { forbidden, notFound } from '../errors';
 import { resolveNow } from '../services/settings';
-import { createUser, markPasswordChanged, profileCount, toUserDto } from '../services/users';
+import { createUser, markPasswordChanged, profileCount, toUserDto, emailForLogin } from '../services/users';
 import { body } from '../validate';
 
 export const authRoutes = new Hono<AppEnv>();
@@ -36,7 +36,7 @@ authRoutes.post('/bootstrap', body(BootstrapSchema), async (c) => {
   const key = c.env.BOOTSTRAP_ADMIN_PASSWORD;
   if (!key || input.setupKey !== key) throw forbidden('The setup key is incorrect');
   const user = await createUser(db, c.get('deps').authAdmin(c.env), {
-    email: input.email,
+    username: input.username,
     displayName: input.displayName,
     role: 'ADMIN',
     unitId: null,
@@ -46,11 +46,17 @@ authRoutes.post('/bootstrap', body(BootstrapSchema), async (c) => {
   return c.json(user, 201);
 });
 
+/** Username → sign-in email, so the client can hand Supabase Auth what it needs. */
+authRoutes.post('/resolve-login', body(LoginSchema), async (c) => {
+  const email = await emailForLogin(c.get('db'), c.req.valid('json').login);
+  return c.json({ email });
+});
+
 /** Demo accounts for one-tap sign-in on demo deployments. */
 authRoutes.get('/demo-accounts', (c) => {
   if (!demoControlsEnabled(c.env)) throw notFound('Route');
   return c.json([
     { email: `cdr.coy1@${DEMO_EMAIL_DOMAIN}`, label: 'Coy 1 commander', role: 'COMMANDER' },
-    { email: `s1admin@${DEMO_EMAIL_DOMAIN}`, label: 'S1 admin', role: 'ADMIN' },
+    { email: `s1admin@${DEMO_EMAIL_DOMAIN}`, label: 'S1 Branch admin', role: 'ADMIN' },
   ]);
 });

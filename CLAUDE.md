@@ -7,9 +7,10 @@ where the project stands. The README covers usage and deployment; this file cove
 ## What this is
 
 SoldierTrack (working name in the original brief: "Parade State") is a mobile-first attendance
-app for a Singapore Army battalion. Unit commanders mark their personnel for the AM parade
-(cut-off 10:00), PM parade (14:00) or an ad hoc event and submit to S1. S1 (battalion admin)
-watches present strength across the battalion, sees who is absent and why, exports Excel/CSV,
+app for **15C4I Battalion**. The battalion's units are called **Branches/Coy** in every label
+(code identifiers stay `unit`/`unitId`). Commanders mark their personnel for the AM parade
+(cut-off 10:00), PM parade (14:00) or an ad hoc event and submit to **S1 Branch**. The admin
+role is labelled "S1 Branch admin" everywhere. S1 Branch watches present strength across the battalion, sees who is absent and why, exports Excel/CSV,
 manages accounts, cut-offs, platoons and past-date unlocks, and reads an executive overview.
 
 - Owner: Ranee (GitHub `UR-B20`). Repo `UR-B20/parade-state`. Work branch
@@ -37,15 +38,21 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   RSI `#AC4A32`, Others `#637181`; Not yet marked is light grey `#CBD3DE`. Tokens live in
   `src/app/styles/tokens.css`; Tailwind names in `src/app/styles/tailwind.css`.
 - Typography: Inter (self-hosted in `public/fonts`), tabular numerals via `.num` for every
-  figure. Touch targets 48px. Light mode only.
+  figure. Touch targets 48px. Light and dark: the same tokens are redefined for dark in
+  `tokens.css` (`[data-theme='dark']` and `prefers-color-scheme` when no explicit choice);
+  the choice lives in `src/app/state/theme.tsx` (Light / Dark / Device in the account sheet,
+  stored in localStorage, applied before first paint by an inline script in `index.html`).
+  Tailwind colour tokens point at the CSS variables, so utilities follow the theme. Charts
+  re-read the tokens (`applyChartTheme`) and remount on theme change.
 - No brass, no Courier, no gradients (a scrim over a photo is the one exception), no phone
   bezel. Restrained glass (backdrop blur) only on the sticky header, sticky footer and sheets.
 - Responsive: one column on phones (design reference 390×844), wide layouts from 900px
   (`wide:` Tailwind breakpoint; `useIsWide` hooks in pages).
 - Brand: SoldierTrack. Assets in `src/app/brand/`. The olive roundel badge works on white and
   is the header mark, favicon and PWA icons (regenerate with `npx tsx scripts/icons.ts`). The
-  horizontal lockups have white type and are only ever placed on the dark hero
-  (`BrandHero.tsx`, login page). Wordmark "Soldier" in ink + "Track" in `--brand-orange-ink`.
+  horizontal lockups have white type and are only ever placed on a dark ground: the login
+  scene (`LoginPage.tsx`: full-bleed camo sleeve photo, dark band with the lockup, card beside
+  it with an uppercase LOGIN title, per the owner's mock). Wordmark "Soldier" in ink + "Track" in `--brand-orange-ink`.
 - Charts (`src/app/charts/theme.ts`): Inter, hairline gridlines, white tooltips with a 1px
   line border, thin marks, 2px surface gaps between stacked segments, direct labels drawn in
   ink (never in the series colour), legend on every multi-series chart, a table view on every
@@ -66,22 +73,28 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 - Submissions are versioned with a content hash (UNMARKED lines included); later changes show
   as "changes since submission" until the unit resubmits. States: NOT_MARKED, PENDING, LATE,
   SUBMITTED, RESUBMITTED. Late = not submitted at cut-off (cron 10:05 and 14:05 SGT).
-- Units: S1, S2, S3, S4, SSP (flat) and Coy 1, Coy 2, ISR Coy (companies with Coy HQ plus
-  platoons). Platoon scope picker on the unit home; per-platoon strength; S1 manages platoons.
+- Branches/Coy: CO Office (sort 0), S1, S2, S3, S4, SSP (flat) and Coy 1, Coy 2, ISR Coy
+  (companies with Coy HQ plus platoons). Platoon scope picker on the unit home; per-platoon strength; S1 manages platoons.
 - Dates are civil dates in Asia/Singapore (fixed +08:00). Commanders edit today and future;
   S1 can unlock a past date for 24 hours.
-- Roles: ADMIN (S1) and COMMANDER (one unit). First admin is created on the Set up
-  SoldierTrack screen with the `BOOTSTRAP_ADMIN_PASSWORD` setup key. Commanders get a
-  temporary password from S1 and must change it on first sign-in.
+- Roles: ADMIN (S1 Branch) and COMMANDER (one Branch/Coy). Accounts sign in with a
+  **username** (`profiles.username`, unique). Supabase Auth still needs an email, so new
+  accounts get `username@accounts.soldiertrack.app` (`src/shared/accounts.ts`); accounts
+  from before usernames keep their real email and `POST /auth/resolve-login` maps username →
+  email for the client. First admin is created on the Set up SoldierTrack screen with the
+  `BOOTSTRAP_ADMIN_PASSWORD` setup key. Commanders get a temporary password from S1 Branch
+  and must change it on first sign-in (the client fetches the account before navigating, so
+  the change-password screen renders straight away).
 - Executive overview (S1, first tab): headline sentence + auto insights
   (`src/shared/domain/insights.ts`), KPI tiles with 7-day deltas, composition donut, present
   share by unit with platoon drill-down, 14-day present-rate trend with 7-day average and a 90%
   norm, absence by reason vs run rate, reporting discipline per unit. Past days come from
   submissions (`src/shared/domain/trends.ts`); today is live. Commanders see their unit's
   14-day sparkline.
-- Demo battalion (`src/shared/demo/dataset.ts`, seeded PRNG): 312 personnel, Sun 6 Sep 2026
-  09:24, totals 263 present / 24 not yet marked / 25 absent, 6 of 8 submitted, 3 unread
-  notifications, 13 prior days of history. Tests assert these numbers; keep the generation
+- Demo battalion (`src/shared/demo/dataset.ts`, seeded PRNG): 318 personnel in 9 Branches/Coy
+  (CO Office has 6, all present), Sun 6 Sep 2026 09:24, totals 269 present / 24 not yet
+  marked / 25 absent, 7 of 9 submitted, 3 unread notifications, 13 prior days of history.
+  The brief's five example rows are excluded from random absence draws. Tests assert these numbers; keep the generation
   order (history is generated last).
 
 ## Working in this repo
@@ -161,6 +174,10 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   account, a commander and personnel and submitted a parade state. `scripts/live-check.mjs`
   now refuses to run when real accounts or personnel exist; never run it with `--force`
   against this project.
+- 7 Sep: owner's change batch shipped: S1 Branch wording, 15C4I Battalion, Branches/Coy, CO
+  Office, username sign-in (migration 0005 backfills usernames from the email local part),
+  login scene per mock, dark mode, change-password race fixed. Existing accounts' usernames:
+  `ranee.uthaya` (admin) and `role_s2br` (commander), editable under Manage accounts.
 - Next: optional Hyperdrive on the session pooler; custom domain; otherwise maintenance.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.

@@ -21,7 +21,7 @@ export async function insertDemoData(db: Db, data: DemoDataset, userIds: Map<str
   await db.transaction(async (tx) => {
     await tx
       .insert(profiles)
-      .values(data.users.map((u) => ({ id: uid(u.id), email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false })))
+      .values(data.users.map((u) => ({ id: uid(u.id), username: u.username, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false })))
       .onConflictDoNothing();
 
     await tx.insert(platoons).values(data.platoons.map((p) => ({ id: p.id, unitId: p.unitId, name: p.name, sortOrder: p.sortOrder }))).onConflictDoNothing();

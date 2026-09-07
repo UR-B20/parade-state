@@ -14,8 +14,8 @@ const SB = process.env.SUPABASE_URL;
 const PUB = process.env.SUPABASE_ANON_KEY;
 const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SETUP = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-const ADMIN = { email: 'smoke-admin@example.com', name: 'CPT Smoke Test', pw: 'SmokeAdmin-2026!' };
-const CDR = { email: 'smoke-cdr@example.com', name: 'LTA Smoke Commander', temp: 'TempPass-2026!', pw: 'CdrPass-2026!' };
+const ADMIN = { username: 'smoke.admin', email: 'smoke.admin@accounts.soldiertrack.app', name: 'CPT Smoke Test', pw: 'SmokeAdmin-2026!' };
+const CDR = { username: 'smoke.cdr', email: 'smoke.cdr@accounts.soldiertrack.app', name: 'LTA Smoke Commander', temp: 'TempPass-2026!', pw: 'CdrPass-2026!' };
 const cleanupOnly = process.argv.includes('--cleanup');
 const sgToday = () => new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
 const results = [];
@@ -101,8 +101,8 @@ console.log('live API smoke test, SG date', today);
 process.on('unhandledRejection', async (e) => { console.error('ABORTED:', e?.message || e); await cleanup().catch((x) => console.error('cleanup failed', x?.message)); process.exit(1); });
 let r = await api('/config'); check('config reachable', r.status === 200 && r.body.demoControls === false, JSON.stringify({ needsBootstrap: r.body.needsBootstrap, demoControls: r.body.demoControls }));
 if (r.body.needsBootstrap) {
-  r = await api('/auth/bootstrap', { method: 'POST', json: { email: ADMIN.email, displayName: ADMIN.name, password: ADMIN.pw, setupKey: 'wrong-key' } }); check('bootstrap rejects a wrong setup key', r.status === 401 || r.status === 403, String(r.status));
-  r = await api('/auth/bootstrap', { method: 'POST', json: { email: ADMIN.email, displayName: ADMIN.name, password: ADMIN.pw, setupKey: SETUP } }); check('bootstrap creates the first admin', r.status === 200 || r.status === 201, `${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
+  r = await api('/auth/bootstrap', { method: 'POST', json: { username: ADMIN.username, displayName: ADMIN.name, password: ADMIN.pw, setupKey: 'wrong-key' } }); check('bootstrap rejects a wrong setup key', r.status === 401 || r.status === 403, String(r.status));
+  r = await api('/auth/bootstrap', { method: 'POST', json: { username: ADMIN.username, displayName: ADMIN.name, password: ADMIN.pw, setupKey: SETUP } }); check('bootstrap creates the first admin', r.status === 200 || r.status === 201, `${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
   r = await api('/config'); check('config after bootstrap', r.body.needsBootstrap === false);
 } else {
   // A real admin exists: create the throwaway admin directly (auth user + profile) so the check never touches real accounts.
@@ -110,7 +110,7 @@ if (r.body.needsBootstrap) {
   if (!users.some((u) => u.email === ADMIN.email)) {
     const cu = await fetch(`${SB}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SECRET, authorization: `Bearer ${SECRET}`, 'content-type': 'application/json' }, body: JSON.stringify({ email: ADMIN.email, password: ADMIN.pw, email_confirm: true }) });
     const cj = await cu.json();
-    const pr = await rest('profiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: cj.id, email: ADMIN.email, display_name: ADMIN.name, role: 'ADMIN', unit_id: null, must_change_password: false }) });
+    const pr = await rest('profiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: cj.id, username: ADMIN.username, email: ADMIN.email, display_name: ADMIN.name, role: 'ADMIN', unit_id: null, must_change_password: false }) });
     check('throwaway admin created directly (real admin already exists)', cu.ok && pr.ok, `${cu.status} ${pr.status}`);
   } else console.log('  (throwaway admin already exists)');
 }
@@ -121,7 +121,7 @@ r = await api('/units', { token: admin }); check('units list (two queries)', r.s
 r = await api(`/events?date=${today}`, { token: admin }); const am = r.body.find((e) => e.type === 'AM'); check('standard events for today', r.status === 200 && !!am && r.body.some((e) => e.type === 'PM'), r.body.map((e) => e.id).join(','));
 await softly('empty battalion summary', async () => { r = await api(`/admin/summary/${am.id}`, { token: admin }); check('empty battalion summary', r.status === 200 && r.body.totals.strength === 0 && r.body.unitsTotal === 8, JSON.stringify(r.body.totals)); });
 await softly('trends on an empty battalion', async () => { r = await api(`/admin/trends/${am.id}`, { token: admin }); check('trends on an empty battalion', r.status === 200 && r.body.days.length === 14, `days ${r.body.days?.length}`); });
-r = await api('/admin/users', { token: admin, method: 'POST', json: { email: CDR.email, displayName: CDR.name, role: 'COMMANDER', unitId: 'COY1', password: CDR.temp } }); check('create commander account', r.status === 200 || r.status === 201 || r.status === 409, `${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
+r = await api('/admin/users', { token: admin, method: 'POST', json: { username: CDR.username, displayName: CDR.name, role: 'COMMANDER', unitId: 'COY1', password: CDR.temp } }); check('create commander account', r.status === 200 || r.status === 201 || r.status === 409, `${r.status} ${JSON.stringify(r.body).slice(0, 120)}`);
 let cdr = await signIn(CDR.email, CDR.temp).catch(() => signIn(CDR.email, CDR.pw));
 r = await api('/auth/me', { token: cdr }); check('commander must change password on first sign-in', r.body.user?.unitId === 'COY1', `mustChange=${r.body.user?.mustChangePassword}`);
 r = await api('/units/COY1/personnel', { token: cdr, method: 'POST', json: { rank: 'CPL', name: 'Smoke Present', platoonId: 'COY1-P1' } }); check('blocked until the password is changed (or allowed)', [200, 201, 403].includes(r.status), String(r.status));

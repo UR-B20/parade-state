@@ -18,7 +18,7 @@ export function PlatoonPicker({ platoons, selected, onChange, strength }: Platoo
   return (
     <div className="filters" role="group" aria-label="Platoon">
       <button type="button" className="chip" aria-pressed={selected === ALL_PLATOONS} onClick={() => onChange(ALL_PLATOONS)}>
-        Whole unit <span className="chip__count num">{strength}</span>
+        Whole Coy <span className="chip__count num">{strength}</span>
       </button>
       {platoons.map((p) => {
         const id = p.platoon?.id ?? NO_PLATOON;

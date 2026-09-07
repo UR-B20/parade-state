@@ -4,10 +4,12 @@ import { profiles, type ProfileRow } from '../db/schema';
 import type { AuthAdmin } from '../auth/supabaseAdmin';
 import { conflict, notFound, validation } from '../errors';
 import type { Role, UnitId, UserDto } from '@shared/types';
+import { accountEmail } from '@shared/accounts';
 
 export function toUserDto(p: ProfileRow): UserDto {
   return {
     id: p.id,
+    username: p.username,
     email: p.email,
     displayName: p.displayName,
     role: p.role,
@@ -34,7 +36,7 @@ export async function getProfile(db: Db, id: string): Promise<ProfileRow | null>
 }
 
 export interface CreateUserInput {
-  email: string;
+  username: string;
   displayName: string;
   role: Role;
   unitId: UnitId | null;
@@ -45,13 +47,15 @@ export interface CreateUserInput {
 /** Creates the Supabase Auth user, then the profile. Rolls the auth user back if the profile insert fails. */
 export async function createUser(db: Db, auth: AuthAdmin, input: CreateUserInput): Promise<UserDto> {
   if (input.role === 'COMMANDER' && !input.unitId) throw validation('A commander must be assigned to a unit', { field: 'unitId' });
-  const [existing] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.email, input.email));
-  if (existing) throw conflict('An account with this email already exists');
-  const { id } = await auth.createUser({ email: input.email, password: input.password, displayName: input.displayName });
+  const username = input.username.trim().toLowerCase();
+  const email = accountEmail(username);
+  const [existing] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.username, username));
+  if (existing) throw conflict('An account with this username already exists');
+  const { id } = await auth.createUser({ email, password: input.password, displayName: input.displayName });
   try {
     const [row] = await db
       .insert(profiles)
-      .values({ id, email: input.email, displayName: input.displayName, role: input.role, unitId: input.role === 'COMMANDER' ? input.unitId : null, mustChangePassword: input.mustChangePassword })
+      .values({ id, username, email, displayName: input.displayName, role: input.role, unitId: input.role === 'COMMANDER' ? input.unitId : null, mustChangePassword: input.mustChangePassword })
       .returning();
     return toUserDto(row!);
   } catch (err) {
@@ -60,12 +64,17 @@ export async function createUser(db: Db, auth: AuthAdmin, input: CreateUserInput
   }
 }
 
-export async function updateUser(db: Db, auth: AuthAdmin, id: string, patch: { displayName?: string; unitId?: UnitId | null; isActive?: boolean }): Promise<UserDto> {
+export async function updateUser(db: Db, auth: AuthAdmin, id: string, patch: { username?: string; displayName?: string; unitId?: UnitId | null; isActive?: boolean }): Promise<UserDto> {
   const current = await getProfile(db, id);
   if (!current) throw notFound('Account');
+  if (patch.username !== undefined && patch.username !== current.username) {
+    const [taken] = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.username, patch.username));
+    if (taken) throw conflict('An account with this username already exists');
+  }
   if (current.role === 'COMMANDER' && patch.unitId === null) throw validation('A commander must be assigned to a unit', { field: 'unitId' });
   const set: Partial<typeof profiles.$inferInsert> = { updatedAt: new Date() };
   if (patch.displayName !== undefined) set.displayName = patch.displayName;
+  if (patch.username !== undefined) set.username = patch.username;
   if (patch.unitId !== undefined && current.role === 'COMMANDER') set.unitId = patch.unitId;
   if (patch.isActive !== undefined) set.isActive = patch.isActive;
   const [row] = await db.update(profiles).set(set).where(eq(profiles.id, id)).returning();
@@ -82,4 +91,12 @@ export async function resetPassword(db: Db, auth: AuthAdmin, id: string, newPass
 
 export async function markPasswordChanged(db: Db, id: string): Promise<void> {
   await db.update(profiles).set({ mustChangePassword: false, updatedAt: new Date() }).where(eq(profiles.id, id));
+}
+
+/** The sign-in email behind a username, or null when no such account exists. */
+export async function emailForLogin(db: Db, login: string): Promise<string | null> {
+  const value = login.trim().toLowerCase();
+  if (value.includes('@')) return value;
+  const [row] = await db.select({ email: profiles.email }).from(profiles).where(eq(profiles.username, value));
+  return row?.email ?? null;
 }

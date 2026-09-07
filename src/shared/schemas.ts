@@ -6,9 +6,18 @@ import { RANK_ORDER } from './ranks';
 
 export const IsoDateSchema = v.pipe(v.string(), v.check(isIsoDate, 'Enter a valid date'));
 export const ClockTimeSchema = v.pipe(v.string(), v.check(isClockTime, 'Enter a time as HH:MM'));
-export const UnitIdSchema = v.picklist(['S1', 'S2', 'S3', 'S4', 'SSP', 'COY1', 'COY2', 'ISR'], 'Choose a unit');
+export const UnitIdSchema = v.picklist(['CO', 'S1', 'S2', 'S3', 'S4', 'SSP', 'COY1', 'COY2', 'ISR'], 'Choose a Branch/Coy');
 export const RankSchema = v.picklist(RANK_ORDER, 'Choose a rank');
 export const EmailSchema = v.pipe(v.string(), v.trim(), v.toLowerCase(), v.email('Enter a valid email'), v.maxLength(254));
+export const UsernameSchema = v.pipe(
+  v.string(),
+  v.trim(),
+  v.toLowerCase(),
+  v.minLength(3, 'Use at least 3 characters'),
+  v.maxLength(32, 'Keep the username under 32 characters'),
+  v.regex(/^[a-z0-9][a-z0-9._-]*$/, 'Letters, digits, dots, dashes and underscores only'),
+);
+export const LoginSchema = v.object({ login: v.pipe(v.string(), v.trim(), v.minLength(1, 'Enter your username')) });
 export const PasswordSchema = v.pipe(v.string(), v.minLength(8, 'Use at least 8 characters'), v.maxLength(72));
 const NameSchema = v.pipe(v.string(), v.trim(), v.minLength(2, 'Enter a name'), v.maxLength(80, 'Keep the name under 80 characters'));
 const RemarkSchema = v.nullish(v.pipe(v.string(), v.maxLength(120, 'Keep the remark under 120 characters')));
@@ -49,7 +58,7 @@ export const CreateAdhocEventSchema = v.object({
 });
 
 export const CreateUserSchema = v.object({
-  email: EmailSchema,
+  username: UsernameSchema,
   displayName: NameSchema,
   role: v.picklist(['ADMIN', 'COMMANDER']),
   unitId: v.nullable(UnitIdSchema),
@@ -57,6 +66,7 @@ export const CreateUserSchema = v.object({
 });
 
 export const UpdateUserSchema = v.object({
+  username: v.optional(UsernameSchema),
   displayName: v.optional(NameSchema),
   unitId: v.optional(v.nullable(UnitIdSchema)),
   isActive: v.optional(v.boolean()),
@@ -65,7 +75,7 @@ export const UpdateUserSchema = v.object({
 export const ResetPasswordSchema = v.object({ newPassword: PasswordSchema });
 
 export const BootstrapSchema = v.object({
-  email: EmailSchema,
+  username: UsernameSchema,
   displayName: NameSchema,
   password: PasswordSchema,
   setupKey: v.pipe(v.string(), v.minLength(1, 'Enter the setup key')),

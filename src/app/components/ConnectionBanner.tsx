@@ -37,7 +37,7 @@ export function LockedDateNotice({ date }: { date: string }) {
       <Icon name="lock" />
       <span className="banner__text">
         Past date locked
-        <small>Attendance for {date} is read-only. Ask S1 to unlock it if a correction is needed.</small>
+        <small>Attendance for {date} is read-only. Ask S1 Branch to unlock it if a correction is needed.</small>
       </span>
     </div>
   );

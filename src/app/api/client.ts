@@ -7,20 +7,21 @@ import type { IsoDate, IsoTimestamp } from '@shared/dates';
 
 export interface CreatePersonBody { rank: string; name: string; platoonId?: string | null; serviceNo?: string | null; postedInDate?: IsoDate }
 export interface UpdatePersonBody { rank?: string; name?: string; platoonId?: string | null; serviceNo?: string | null; postedOutDate?: IsoDate | null }
-export interface CreateUserBody { email: string; displayName: string; role: 'ADMIN' | 'COMMANDER'; unitId: string | null; password: string }
-export interface UpdateUserBody { displayName?: string; unitId?: string | null; isActive?: boolean }
+export interface CreateUserBody { username: string; displayName: string; role: 'ADMIN' | 'COMMANDER'; unitId: string | null; password: string }
+export interface UpdateUserBody { username?: string; displayName?: string; unitId?: string | null; isActive?: boolean }
 export interface CreateAdhocBody { date: IsoDate; name: string; cutoffTime: string }
 
 export interface DemoAccount { email: string; label: string; role: 'ADMIN' | 'COMMANDER' }
-export interface BootstrapBody { email: string; displayName: string; password: string; setupKey: string }
+export interface BootstrapBody { username: string; displayName: string; password: string; setupKey: string }
 
 /** Everything the UI needs from the server. Implemented by the HTTP client and the demo mock. */
 export interface ApiClient {
-  signIn(email: string, password: string): Promise<void>;
+  /** `login` is a username, or an email for accounts that predate usernames. */
+  signIn(login: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   /** One-tap demo accounts; empty unless demo controls are enabled. */
   demoAccounts(): Promise<DemoAccount[]>;
-  /** Creates the first S1 admin while no accounts exist. */
+  /** Creates the first S1 Branch admin while no accounts exist. */
   bootstrap(body: BootstrapBody): Promise<UserDto>;
   changePassword(newPassword: string): Promise<void>;
   me(): Promise<MeDto>;

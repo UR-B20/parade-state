@@ -15,20 +15,20 @@ describe('config and bootstrap', () => {
   });
 
   it('rejects a wrong setup key and validates the body', async () => {
-    const bad = await h.json('/auth/bootstrap', { method: 'POST', json: { email: 's1@bn.sg', displayName: 'CPT Ong', password: 'longenough1', setupKey: 'nope' } });
+    const bad = await h.json('/auth/bootstrap', { method: 'POST', json: { username: 's1admin', displayName: 'CPT Ong', password: 'longenough1', setupKey: 'nope' } });
     expect(bad.status).toBe(403);
-    const invalid = await h.json<{ error: { code: string; details: { fields: Record<string, string> } } }>('/auth/bootstrap', { method: 'POST', json: { email: 'not-an-email', displayName: 'X', password: 'short', setupKey: 'setup-key-123' } });
+    const invalid = await h.json<{ error: { code: string; details: { fields: Record<string, string> } } }>('/auth/bootstrap', { method: 'POST', json: { username: 'no spaces!', displayName: 'X', password: 'short', setupKey: 'setup-key-123' } });
     expect(invalid.status).toBe(400);
     expect(invalid.body.error.code).toBe('VALIDATION');
-    expect(Object.keys(invalid.body.error.details.fields).sort()).toEqual(['displayName', 'email', 'password']);
+    expect(Object.keys(invalid.body.error.details.fields).sort()).toEqual(['displayName', 'password', 'username']);
   });
 
   it('creates the first admin once, then refuses', async () => {
-    const ok = await h.json<UserDto>('/auth/bootstrap', { method: 'POST', json: { email: 'S1@bn.sg', displayName: 'CPT Ong Li Ting', password: 'longenough1', setupKey: 'setup-key-123' } });
+    const ok = await h.json<UserDto>('/auth/bootstrap', { method: 'POST', json: { username: 'S1.Admin', displayName: 'CPT Ong Li Ting', password: 'longenough1', setupKey: 'setup-key-123' } });
     expect(ok.status).toBe(201);
-    expect(ok.body).toMatchObject({ email: 's1@bn.sg', role: 'ADMIN', mustChangePassword: false });
-    expect(h.auth.created[0]).toMatchObject({ email: 's1@bn.sg', password: 'longenough1' });
-    const again = await h.json('/auth/bootstrap', { method: 'POST', json: { email: 'x@bn.sg', displayName: 'Someone', password: 'longenough1', setupKey: 'setup-key-123' } });
+    expect(ok.body).toMatchObject({ username: 's1.admin', email: 's1.admin@accounts.soldiertrack.app', role: 'ADMIN', mustChangePassword: false });
+    expect(h.auth.created[0]).toMatchObject({ email: 's1.admin@accounts.soldiertrack.app', password: 'longenough1' });
+    const again = await h.json('/auth/bootstrap', { method: 'POST', json: { username: 'someone', displayName: 'Someone', password: 'longenough1', setupKey: 'setup-key-123' } });
     expect(again.status).toBe(403);
     expect((await h.json<{ needsBootstrap: boolean }>('/config')).body.needsBootstrap).toBe(false);
   });
@@ -45,7 +45,7 @@ describe('me and guards', () => {
     const adminId = h.auth.created[0]!.id;
     const { status, body } = await h.json<MeDto>('/auth/me', { as: adminId });
     expect(status).toBe(200);
-    expect(body.user.email).toBe('s1@bn.sg');
+    expect(body.user).toMatchObject({ username: 's1.admin', email: 's1.admin@accounts.soldiertrack.app' });
     expect(body.sgToday).toBe('2026-09-06');
     expect(body.demo).toEqual({ enabled: false, now: null });
   });
@@ -74,12 +74,12 @@ describe('S1 user administration', () => {
   });
 
   it('creates a commander who must change their password, and rejects duplicates and unit-less commanders', async () => {
-    const created = await h.json<UserDto>('/admin/users', { method: 'POST', as: adminId, json: { email: 'cdr.s3@bn.sg', displayName: 'CPT Tan', role: 'COMMANDER', unitId: 'S3', password: 'welcome123' } });
+    const created = await h.json<UserDto>('/admin/users', { method: 'POST', as: adminId, json: { username: 'cdr.s3', displayName: 'CPT Tan', role: 'COMMANDER', unitId: 'S3', password: 'welcome123' } });
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({ role: 'COMMANDER', unitId: 'S3', mustChangePassword: true });
-    const dup = await h.json('/admin/users', { method: 'POST', as: adminId, json: { email: 'cdr.s3@bn.sg', displayName: 'CPT Tan', role: 'COMMANDER', unitId: 'S3', password: 'welcome123' } });
+    const dup = await h.json('/admin/users', { method: 'POST', as: adminId, json: { username: 'cdr.s3', displayName: 'CPT Tan', role: 'COMMANDER', unitId: 'S3', password: 'welcome123' } });
     expect(dup.status).toBe(409);
-    const noUnit = await h.json('/admin/users', { method: 'POST', as: adminId, json: { email: 'cdr.s4@bn.sg', displayName: 'CPT Goh', role: 'COMMANDER', unitId: null, password: 'welcome123' } });
+    const noUnit = await h.json('/admin/users', { method: 'POST', as: adminId, json: { username: 'cdr.s4', displayName: 'CPT Goh', role: 'COMMANDER', unitId: null, password: 'welcome123' } });
     expect(noUnit.status).toBe(400);
   });
 

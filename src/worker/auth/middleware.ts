@@ -45,14 +45,14 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (!token) throw unauthorized();
   const verified = await c.get('deps').verifyToken(token, c.env);
   const profile = await getProfile(c.get('db'), verified.sub);
-  if (!profile) throw unauthorized('Your account is not set up yet. Ask S1 to create it.');
+  if (!profile) throw unauthorized('Your account is not set up yet. Ask S1 Branch to create it.');
   if (!profile.isActive) throw forbidden('This account has been deactivated');
   c.set('user', profile);
   await next();
 });
 
 export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
-  if (c.get('user').role !== 'ADMIN') throw forbidden('Only S1 can do this');
+  if (c.get('user').role !== 'ADMIN') throw forbidden('Only S1 Branch can do this');
   await next();
 });
 

@@ -55,7 +55,7 @@ export function SettingsPage() {
         title="Cut-offs and unlocks"
         actions={
           <>
-            <Link to="/admin" className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}><Icon name="chevronLeft" size={18} /> Battalion</Link>
+            <Link to="/admin" className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}><Icon name="chevronLeft" size={18} /> 15C4I Battalion</Link>
             <AccountButton onClick={() => setAccountOpen(true)} />
           </>
         }

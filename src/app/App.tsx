@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { QueryClient, onlineManager } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createBrowserRouter, createHashRouter, Navigate, Outlet, RouterProvider, useParams } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, Navigate, Outlet, RouterProvider, useLocation, useParams } from 'react-router-dom';
 import { ApiProvider } from './api/provider';
 import { bootstrapApi, type Bootstrapped } from './api';
 import { useMe } from './api/queries';
@@ -9,6 +9,7 @@ import { MARK_MUTATION_KEY, type MarkVariables } from './api/mutations';
 import { AuthProvider } from './state/auth';
 import { ConfigProvider } from './state/config';
 import { DemoProvider } from './state/demo';
+import { ThemeProvider } from './state/theme';
 import { ToastProvider } from './components/Toast';
 import { MarkPage } from './pages/commander/MarkPage';
 import { RollPage } from './pages/commander/RollPage';
@@ -38,9 +39,12 @@ function LoadingPage() {
 
 function Shell({ children }: { children: ReactNode }) {
   const meQ = useMe();
-  if (meQ.isPending) return <LoadingPage />;
+  const location = useLocation();
+  // While a sign-in is refreshing the account (error state but fetching), keep the loading
+  // screen rather than bouncing to /login and back.
+  if (meQ.isPending || (!meQ.data && meQ.isFetching)) return <LoadingPage />;
   if (meQ.isError || !meQ.data) return <Navigate to="/login" replace />;
-  if (meQ.data.user.mustChangePassword && !location.pathname.endsWith('/account/password') && !location.hash.endsWith('/account/password')) {
+  if (meQ.data.user.mustChangePassword && !location.pathname.endsWith('/account/password')) {
     return (
       <AuthProvider me={meQ.data}>
         <Navigate to="/account/password" replace />
@@ -56,7 +60,7 @@ function Shell({ children }: { children: ReactNode }) {
 
 function Home() {
   const meQ = useMe();
-  if (!meQ.data) return null;
+  if (!meQ.data) return <LoadingPage />;
   return <Navigate to={meQ.data.user.role === 'ADMIN' ? '/admin' : '/mark'} replace />;
 }
 
@@ -149,9 +153,11 @@ export function App() {
           persistOptions={{ persister, buster: PERSIST_BUSTER, maxAge: 24 * 3600_000, dehydrateOptions: { shouldDehydrateQuery: (q) => q.queryKey[0] !== 'me' && q.state.status === 'success' } }}
           onSuccess={() => { void queryClient.resumePausedMutations(); }}
         >
-          <ToastProvider>
-            <RouterProvider router={router} />
-          </ToastProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <RouterProvider router={router} />
+            </ToastProvider>
+          </ThemeProvider>
         </PersistQueryClientProvider>
       </ApiProvider>
     </ConfigProvider>

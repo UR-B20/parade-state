@@ -1,4 +1,4 @@
-/* Parade State design tokens. Light mode only, per the brief. */
+/* SoldierTrack design tokens. Light is the reference palette; dark redefines the same tokens. */
 :root {
   color-scheme: light;
 
@@ -90,6 +90,94 @@
 
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
+}
+
+
+/* Dark: same hues, lifted for a dark ground; status colours keep their identity. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --surface: #111a24;
+    --page: #0b1218;
+    --surface-2: #182330;
+    --text: #e6ecf3;
+    --text-2: #9fadbf;
+    --text-3: #7a889b;
+    --line: #233142;
+    --line-strong: #33445a;
+    --brand-orange-ink: #ffb347;
+    --primary: #6f92ff;
+    --primary-hover: #84a2ff;
+    --primary-tint: #1b2a4d;
+    --on-primary: #0b1218;
+    --present: #2fbf9f;
+    --present-tint: #0f2b26;
+    --mc: #f07a88;
+    --mc-tint: #3a1a20;
+    --ll: #d9a24a;
+    --ll-tint: #33271a;
+    --ma: #6ea8ef;
+    --ma-tint: #152a45;
+    --rsi: #f08b6e;
+    --rsi-tint: #3a2119;
+    --others: #9aa8b9;
+    --others-tint: #1e2833;
+    --unmarked: #7a889b;
+    --unmarked-tint: #1b2530;
+    --ok: #4fc27a;
+    --ok-tint: #123222;
+    --warn: #e0b25a;
+    --warn-tint: #33291a;
+    --danger: #f07a88;
+    --danger-tint: #3a1a20;
+    --pending: #9fadbf;
+    --pending-tint: #1b2530;
+    --glass-bg: rgba(17, 26, 36, 0.82);
+    --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.5);
+    --shadow-menu: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface: #111a24;
+  --page: #0b1218;
+  --surface-2: #182330;
+  --text: #e6ecf3;
+  --text-2: #9fadbf;
+  --text-3: #7a889b;
+  --line: #233142;
+  --line-strong: #33445a;
+  --brand-orange-ink: #ffb347;
+  --primary: #6f92ff;
+  --primary-hover: #84a2ff;
+  --primary-tint: #1b2a4d;
+  --on-primary: #0b1218;
+  --present: #2fbf9f;
+  --present-tint: #0f2b26;
+  --mc: #f07a88;
+  --mc-tint: #3a1a20;
+  --ll: #d9a24a;
+  --ll-tint: #33271a;
+  --ma: #6ea8ef;
+  --ma-tint: #152a45;
+  --rsi: #f08b6e;
+  --rsi-tint: #3a2119;
+  --others: #9aa8b9;
+  --others-tint: #1e2833;
+  --unmarked: #7a889b;
+  --unmarked-tint: #1b2530;
+  --ok: #4fc27a;
+  --ok-tint: #123222;
+  --warn: #e0b25a;
+  --warn-tint: #33291a;
+  --danger: #f07a88;
+  --danger-tint: #3a1a20;
+  --pending: #9fadbf;
+  --pending-tint: #1b2530;
+  --glass-bg: rgba(17, 26, 36, 0.82);
+  --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-menu: 0 6px 24px rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {

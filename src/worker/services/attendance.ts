@@ -147,7 +147,7 @@ export async function assertEventDateEditable(db: Db, env: Bindings, event: Even
   if (user.role === 'ADMIN') return;
   const { now } = await resolveNow(db, env, realNow);
   if (await isLockedForCommander(db, event.date, now)) {
-    throw new AppError('DATE_LOCKED', 'This date is locked. Ask S1 to unlock it to make corrections.');
+    throw new AppError('DATE_LOCKED', 'This date is locked. Ask S1 Branch to unlock it to make corrections.');
   }
 }
 

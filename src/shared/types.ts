@@ -1,7 +1,7 @@
 import type { AbsenceStatus, EffectiveKind, OthersSubType } from './statuses';
 import type { IsoDate, IsoTimestamp } from './dates';
 
-export type UnitId = 'S1' | 'S2' | 'S3' | 'S4' | 'SSP' | 'COY1' | 'COY2' | 'ISR';
+export type UnitId = 'CO' | 'S1' | 'S2' | 'S3' | 'S4' | 'SSP' | 'COY1' | 'COY2' | 'ISR';
 export type Role = 'ADMIN' | 'COMMANDER';
 export type EventType = 'AM' | 'PM' | 'ADHOC';
 
@@ -22,6 +22,7 @@ export interface UnitDto {
 
 export interface UserDto {
   id: string;
+  username: string;
   email: string;
   displayName: string;
   role: Role;

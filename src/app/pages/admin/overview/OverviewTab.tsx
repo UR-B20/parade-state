@@ -12,6 +12,7 @@ import { KpiTiles } from './KpiTiles';
 import { Timeliness } from './Timeliness';
 import { TrendLine } from './TrendLine';
 import { UnitStack } from './UnitStack';
+import { useTheme } from '../../../state/theme';
 
 interface OverviewTabProps {
   summary: BattalionSummaryDto | undefined;
@@ -21,6 +22,7 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ summary, trends, error, onRetry }: OverviewTabProps) {
+  const { resolved: theme } = useTheme();
   const briefing = useMemo(() => (trends ? buildBriefing(trends, summary) : null), [trends, summary]);
   if (error && !(summary && trends)) {
     return <EmptyState icon="alert" title="Couldn't load the overview" text={error instanceof ApiError ? error.message : 'Check your connection and try again.'} action={<Button onClick={onRetry}>Try again</Button>} />;
@@ -35,7 +37,7 @@ export function OverviewTab({ summary, trends, error, onRetry }: OverviewTabProp
     );
   }
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-3" key={theme}>
       <Briefing briefing={briefing} />
       <KpiTiles summary={summary} trends={trends} briefing={briefing} />
       <div className="grid gap-3 wide:grid-cols-12">

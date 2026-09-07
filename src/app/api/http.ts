@@ -1,3 +1,4 @@
+import { isEmailLike } from '@shared/accounts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IsoDate, IsoTimestamp } from '@shared/dates';
 import type {
@@ -51,9 +52,11 @@ export class HttpApi implements ApiClient {
     return (text ? JSON.parse(text) : undefined) as T;
   }
 
-  async signIn(email: string, password: string): Promise<void> {
+  async signIn(login: string, password: string): Promise<void> {
+    const email = isEmailLike(login) ? login.trim().toLowerCase() : (await this.call<{ email: string | null }>('/auth/resolve-login', { method: 'POST', json: { login } })).email;
+    if (!email) throw new ApiError('UNAUTHORIZED', 'Username or password is incorrect.', 401);
     const { error } = await this.supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new ApiError('UNAUTHORIZED', error.status === 400 ? 'Email or password is incorrect.' : error.message, error.status ?? 401);
+    if (error) throw new ApiError('UNAUTHORIZED', error.status === 400 ? 'Username or password is incorrect.' : error.message, error.status ?? 401);
   }
 
   async signOut(): Promise<void> {
@@ -67,7 +70,7 @@ export class HttpApi implements ApiClient {
 
   async bootstrap(body: BootstrapBody): Promise<UserDto> {
     const user = await this.call<UserDto>('/auth/bootstrap', { method: 'POST', json: body });
-    await this.signIn(body.email, body.password);
+    await this.signIn(user.email, body.password);
     return user;
   }
 

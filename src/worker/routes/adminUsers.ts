@@ -14,7 +14,7 @@ adminUserRoutes.get('/', async (c) => c.json(await listUsers(c.get('db'))));
 adminUserRoutes.post('/', body(CreateUserSchema), async (c) => {
   const input = c.req.valid('json');
   const user = await createUser(c.get('db'), c.get('deps').authAdmin(c.env), {
-    email: input.email,
+    username: input.username,
     displayName: input.displayName,
     role: input.role,
     unitId: (input.unitId as UnitId | null) ?? null,

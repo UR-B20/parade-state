@@ -4,13 +4,16 @@ import type { ChartData, ChartOptions } from 'chart.js';
 import { buildBriefing, pct, rateOf, shortDate } from '@shared/domain';
 import type { TrendsDto } from '@shared/types';
 import { STATUS_COLOR, surface, withAlpha } from '../charts/theme';
+import { useTheme } from '../state/theme';
 
 /** The commander's view of the same 14-day trend S1 sees: a sparkline and three figures. */
 export function UnitTrendCard({ trends }: { trends: TrendsDto }) {
+  const { resolved: theme } = useTheme();
   const days = trends.days;
   const rates = useMemo(() => days.map((d) => (d.unitsSubmitted > 0 || d.live ? rateOf(d.counts) : null)), [days]);
   const briefing = useMemo(() => buildBriefing(trends), [trends]);
   const present = STATUS_COLOR['PRESENT']!();
+  void theme; // re-read colours when the palette changes
   const unit = trends.units[0];
   const data = useMemo<ChartData<'line'>>(() => ({
     labels: days.map((d) => shortDate(d.date)),
@@ -48,7 +51,7 @@ export function UnitTrendCard({ trends }: { trends: TrendsDto }) {
   }), [days, rates]);
   const slips = unit ? unit.late + unit.missed : 0;
   return (
-    <section className="flex flex-col gap-2 rounded-card border border-line bg-surface px-5 py-4" aria-label="Unit trend, last 14 parades">
+    <section key={theme} className="flex flex-col gap-2 rounded-card border border-line bg-surface px-5 py-4" aria-label="Unit trend, last 14 parades">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[13px] font-medium text-ink-2">Last 14 parades</h2>
         <span className="num text-xs text-ink-2">7-day avg <b className="font-semibold text-ink">{pct(briefing.avg7)}</b></span>

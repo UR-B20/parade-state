@@ -118,12 +118,12 @@ describe('late notifications', () => {
     // Move the demo clock past the AM cut-off (10:05 SGT).
     await h.json('/admin/demo-clock', { method: 'PUT', as: admin, json: { now: '2026-09-06T02:05:00.000Z' } });
     const first = await runScheduled(h.env, deps);
-    expect(first).toEqual({ date: '2026-09-06', lateNotifications: 7 * 2 }); // 7 units without a submission x 2 admins
+    expect(first).toEqual({ date: '2026-09-06', lateNotifications: 8 * 2 }); // 8 units without a submission x 2 admins (9 units, Coy 1 submitted)
     const second = await runScheduled(h.env, deps);
     expect(second.lateNotifications).toBe(0);
     const n = await notifs();
     const late = n.body.items.filter((i) => i.type === 'LATE');
-    expect(late).toHaveLength(7);
+    expect(late).toHaveLength(8);
     expect(late.some((i) => i.unitName === 'Coy 1')).toBe(false);
     expect(late.find((i) => i.unitName === 'S2')?.message).toBe('S2 has not submitted AM parade · cut-off 10:00');
     const coy2 = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${AM}`, { as: cdr2 });

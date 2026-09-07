@@ -28,12 +28,12 @@ describe('battalion trends', () => {
     expect(body.days).toHaveLength(14);
     expect(body.days.map((d) => d.date)[0]).toBe('2026-08-24');
     const today = body.days[13]!;
-    expect(today).toMatchObject({ date: '2026-09-06', live: true, unitsSubmitted: 6, unitsTotal: 8, onTime: 6, late: 0 });
-    expect(today.counts).toMatchObject({ strength: 312, present: 263, unmarked: 24, absent: 25 });
-    // Thu 3 Sep: S2 did not submit, so the day covers 7 units and 298 personnel.
+    expect(today).toMatchObject({ date: '2026-09-06', live: true, unitsSubmitted: 7, unitsTotal: 9, onTime: 7, late: 0 });
+    expect(today.counts).toMatchObject({ strength: 318, present: 269, unmarked: 24, absent: 25 });
+    // Thu 3 Sep: S2 did not submit, so the day covers 8 units and 304 personnel.
     const thu = body.days.find((d) => d.date === '2026-09-03')!;
-    expect(thu).toMatchObject({ live: false, unitsSubmitted: 7, unitsTotal: 8 });
-    expect(thu.counts.strength).toBe(298);
+    expect(thu).toMatchObject({ live: false, unitsSubmitted: 8, unitsTotal: 9 });
+    expect(thu.counts.strength).toBe(304);
     expect(thu.counts.unmarked).toBe(0);
     // Tue 1 Sep is the report-sick spike.
     const tue = body.days.find((d) => d.date === '2026-09-01')!;

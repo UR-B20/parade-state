@@ -1,6 +1,8 @@
 # SoldierTrack
 
-Mobile-first parade state reporting for a battalion. Because every soldier counts. Unit commanders mark their personnel for the
+Mobile-first parade state reporting for 15C4I Battalion. Because every soldier counts.
+Branch/Coy commanders mark and submit; S1 Branch sees the battalion. Accounts sign in with a
+username; light and dark appearance. Unit commanders mark their personnel for the
 AM parade, PM parade or an ad hoc event and submit to S1. S1 watches present strength and unit
 submissions across the battalion, sees who is absent and why, and exports to Excel or CSV.
 

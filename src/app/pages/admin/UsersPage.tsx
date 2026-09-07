@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as v from 'valibot';
-import { CreateUserSchema, firstIssue, PasswordSchema } from '@shared/schemas';
+import { CreateUserSchema, firstIssue, PasswordSchema, UsernameSchema } from '@shared/schemas';
 import type { UnitDto, UserDto } from '@shared/types';
 import { ApiError, type CreateUserBody } from '../../api/client';
 import { keys } from '../../api/keys';
@@ -57,10 +57,10 @@ export function UsersPage() {
       <button type="button" className="person" onClick={() => setEditing(u)} aria-label={`Edit ${u.displayName}`}>
         <span className="person__main">
           <span className="person__name truncate">{u.displayName}</span>
-          <span className="person__meta"><span className="person__detail truncate">{u.email}</span></span>
+          <span className="person__meta"><span className="person__detail truncate">{u.username}</span></span>
         </span>
         <span className="person__side">
-          {!u.isActive ? <StatusPill tone="danger">Deactivated</StatusPill> : u.mustChangePassword ? <StatusPill tone="warn">Password pending</StatusPill> : u.role === 'COMMANDER' ? <StatusPill tone="neutral">{unitName(u.unitId)}</StatusPill> : <StatusPill tone="pending">S1 admin</StatusPill>}
+          {!u.isActive ? <StatusPill tone="danger">Deactivated</StatusPill> : u.mustChangePassword ? <StatusPill tone="warn">Password pending</StatusPill> : u.role === 'COMMANDER' ? <StatusPill tone="neutral">{unitName(u.unitId)}</StatusPill> : <StatusPill tone="pending">S1 Branch admin</StatusPill>}
         </span>
       </button>
     </li>
@@ -73,7 +73,7 @@ export function UsersPage() {
         meta={usersQ.data ? `${usersQ.data.filter((u) => u.isActive).length} active` : undefined}
         actions={
           <>
-            <Link to="/admin" className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}><Icon name="chevronLeft" size={18} /> Battalion</Link>
+            <Link to="/admin" className="btn btn--ghost btn--small" style={{ textDecoration: 'none' }}><Icon name="chevronLeft" size={18} /> 15C4I Battalion</Link>
             <AccountButton onClick={() => setAccountOpen(true)} />
           </>
         }
@@ -90,7 +90,7 @@ export function UsersPage() {
               {groups.commanders.length === 0 ? <div className="roll"><EmptyState title="No commander accounts yet" text="Each unit needs at least one commander to mark attendance." /></div> : <ul className="roll">{groups.commanders.map(renderUser)}</ul>}
             </section>
             <section className="group" aria-labelledby="adm-title">
-              <h2 id="adm-title" className="group__title"><span>S1 admins</span><span className="num">{groups.admins.length}</span></h2>
+              <h2 id="adm-title" className="group__title"><span>S1 Branch admins</span><span className="num">{groups.admins.length}</span></h2>
               <ul className="roll">{groups.admins.map(renderUser)}</ul>
             </section>
           </>
@@ -127,7 +127,7 @@ interface UserSheetProps {
   busy: boolean;
   onClose: () => void;
   onCreate: (body: CreateUserBody) => void;
-  onUpdate: (id: string, patch: { displayName?: string; unitId?: string | null; isActive?: boolean }) => void;
+  onUpdate: (id: string, patch: { username?: string; displayName?: string; unitId?: string | null; isActive?: boolean }) => void;
   onReset: (id: string, password: string) => void;
 }
 
@@ -135,7 +135,7 @@ function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClos
   const isNew = user === 'new';
   const existing = user && user !== 'new' ? user : null;
   const [key, setKey] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'COMMANDER'>('COMMANDER');
   const [unitId, setUnitId] = useState<string>('S1');
@@ -146,7 +146,7 @@ function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClos
   const currentKey = user === null ? null : isNew ? 'new' : existing!.id;
   if (currentKey !== key) {
     setKey(currentKey);
-    setEmail(existing?.email ?? '');
+    setUsername(existing?.username ?? '');
     setDisplayName(existing?.displayName ?? '');
     setRole(existing?.role ?? 'COMMANDER');
     setUnitId(existing?.unitId ?? 'S1');
@@ -157,12 +157,14 @@ function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClos
 
   const submit = () => {
     if (isNew) {
-      const parsed = v.safeParse(CreateUserSchema, { email, displayName, role, unitId: role === 'COMMANDER' ? unitId : null, password });
+      const parsed = v.safeParse(CreateUserSchema, { username, displayName, role, unitId: role === 'COMMANDER' ? unitId : null, password });
       if (!parsed.success) return setErrors(firstIssue(parsed.issues));
       onCreate(parsed.output);
     } else if (existing) {
       if (displayName.trim().length < 2) return setErrors({ displayName: 'Enter a name' });
-      onUpdate(existing.id, { displayName: displayName.trim(), unitId: existing.role === 'COMMANDER' ? unitId : undefined });
+      const parsedName = v.safeParse(UsernameSchema, username);
+      if (!parsedName.success) return setErrors({ username: parsedName.issues[0]?.message ?? 'Invalid username' });
+      onUpdate(existing.id, { username: parsedName.output !== existing.username ? parsedName.output : undefined, displayName: displayName.trim(), unitId: existing.role === 'COMMANDER' ? unitId : undefined });
     }
   };
 
@@ -178,7 +180,7 @@ function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClos
       open={user !== null}
       onClose={onClose}
       title={isNew ? 'Create account' : existing?.displayName ?? ''}
-      subtitle={isNew ? 'They sign in with this email and must change the password on first sign-in.' : existing?.email}
+      subtitle={isNew ? 'They sign in with the username and must change the password on first sign-in.' : existing?.username}
       footer={
         <>
           <Button variant="primary" block busy={busy} onClick={submit}>{isNew ? 'Create account' : 'Save'}</Button>
@@ -190,13 +192,11 @@ function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClos
         </>
       }
     >
-      {isNew && (
-        <label className="field">
-          <span className="field__label">Email</span>
-          <input className="field__input" type="email" inputMode="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={!!errors['email'] || undefined} />
-          {errors['email'] && <span className="field__error" role="alert">{errors['email']}</span>}
-        </label>
-      )}
+      <label className="field">
+        <span className="field__label">Username</span>
+        <input className="field__input" type="text" autoComplete="off" autoCapitalize="none" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} aria-invalid={!!errors['username'] || undefined} />
+        {errors['username'] ? <span className="field__error" role="alert">{errors['username']}</span> : isNew ? <span className="field__hint">They sign in with this. Letters, digits, dots, dashes and underscores.</span> : null}
+      </label>
       <label className="field">
         <span className="field__label">Name and rank</span>
         <input className="field__input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. MAJ Lim Wei Jie" aria-invalid={!!errors['displayName'] || undefined} />
@@ -207,23 +207,23 @@ function UserSheet({ user, units, unitsState, onRetryUnits, selfId, busy, onClos
           <span className="field__label">Role</span>
           <div className="subtype-grid">
             <button type="button" className="subtype-opt" aria-pressed={role === 'COMMANDER'} onClick={() => setRole('COMMANDER')}>Unit commander</button>
-            <button type="button" className="subtype-opt" aria-pressed={role === 'ADMIN'} onClick={() => setRole('ADMIN')}>S1 admin</button>
+            <button type="button" className="subtype-opt" aria-pressed={role === 'ADMIN'} onClick={() => setRole('ADMIN')}>S1 Branch admin</button>
           </div>
         </div>
       )}
       {(isNew ? role === 'COMMANDER' : existing?.role === 'COMMANDER') && (
         <label className="field">
-          <span className="field__label">Unit</span>
+          <span className="field__label">Branch/Coy</span>
           {units.length > 0 ? (
             <select className="field__input" value={units.some((u) => u.id === unitId) ? unitId : units[0]!.id} onChange={(e) => setUnitId(e.target.value)}>
               {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           ) : unitsState === 'error' ? (
             <span className="field__error" role="alert">
-              Couldn't load the units. <button type="button" className="btn btn--ghost btn--small" onClick={onRetryUnits}>Try again</button>
+              Couldn't load the Branches/Coy. <button type="button" className="btn btn--ghost btn--small" onClick={onRetryUnits}>Try again</button>
             </span>
           ) : (
-            <span className="field__hint" aria-live="polite">Loading units…</span>
+            <span className="field__hint" aria-live="polite">Loading Branches/Coy…</span>
           )}
         </label>
       )}

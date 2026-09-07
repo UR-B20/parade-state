@@ -14,6 +14,7 @@ import {
   MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, buildTrends, trendDates, type SnapshotEntry, type SpanRow, type TrendSubmission,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
+import { accountEmail } from '@shared/accounts';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
 
 const LATENCY_MS = 220;
@@ -71,7 +72,7 @@ export class MockApi implements ApiClient {
   private currentUser(): UserDto {
     const u = this.currentEmail ? this.data.users.find((x) => x.email === this.currentEmail) : undefined;
     if (!u) throw new ApiError('UNAUTHORIZED', 'Sign in to continue', 401);
-    return { id: u.id, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' };
+    return { id: u.id, username: u.username, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' };
   }
 
   private unit(unitId: string): UnitDto {
@@ -144,10 +145,11 @@ export class MockApi implements ApiClient {
 
   // ---- auth / meta ----
 
-  signIn(email: string, password: string): Promise<void> {
+  signIn(login: string, password: string): Promise<void> {
     return this.wait(() => {
-      const u = this.data.users.find((x) => x.email === email.trim().toLowerCase());
-      if (!u || password !== 'demo1234') throw new ApiError('UNAUTHORIZED', 'Email or password is incorrect.', 401);
+      const value = login.trim().toLowerCase();
+      const u = this.data.users.find((x) => x.email === value || x.username === value);
+      if (!u || password !== 'demo1234') throw new ApiError('UNAUTHORIZED', 'Username or password is incorrect.', 401);
       this.currentEmail = u.email;
     });
   }
@@ -161,13 +163,14 @@ export class MockApi implements ApiClient {
   demoAccounts(): Promise<DemoAccount[]> {
     return this.wait(() => [
       { email: DEFAULT_EMAIL, label: 'Coy 1 commander', role: 'COMMANDER' },
-      { email: ADMIN_EMAIL, label: 'S1 admin', role: 'ADMIN' },
+      { email: ADMIN_EMAIL, label: 'S1 Branch admin', role: 'ADMIN' },
     ]);
   }
 
   bootstrap(body: BootstrapBody): Promise<UserDto> {
     return this.wait(() => {
-      const u = { id: this.newId('u'), email: body.email.toLowerCase(), displayName: body.displayName, role: 'ADMIN' as const, unitId: null };
+      const username = body.username.trim().toLowerCase();
+      const u = { id: this.newId('u'), username, email: accountEmail(username), displayName: body.displayName, role: 'ADMIN' as const, unitId: null };
       this.data.users.push(u);
       this.currentEmail = u.email;
       return { ...u, mustChangePassword: false, isActive: true, createdAt: this.nowIso() };
@@ -308,7 +311,7 @@ export class MockApi implements ApiClient {
       const event = this.eventById(eventId);
       const user = this.currentUser();
       if (user.role !== 'ADMIN' && isDateLocked(event.date, this.today(), this.unlocks, this.now())) {
-        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 to unlock it to make corrections.', 403);
+        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 Branch to unlock it to make corrections.', 403);
       }
       const person = this.data.personnel.find((p) => p.id === personId && p.unitId === unitId);
       if (!person) throw new ApiError('NOT_FOUND', 'Person not found in this unit', 404);
@@ -350,7 +353,7 @@ export class MockApi implements ApiClient {
       const event = this.eventById(eventId);
       const user = this.currentUser();
       if (user.role !== 'ADMIN' && isDateLocked(event.date, this.today(), this.unlocks, this.now())) {
-        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 to unlock it to make corrections.', 403);
+        throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 Branch to unlock it to make corrections.', 403);
       }
       const { statuses } = this.computeUnit(unitId, event);
       const ids = planMarkRemainingPresent(statuses);
@@ -497,7 +500,7 @@ export class MockApi implements ApiClient {
   download(eventId: string, format: 'xlsx' | 'csv'): Promise<Blob> {
     return this.wait(async () => {
       const abs = await this.absentees(eventId);
-      const lines = [['Unit', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark'].join(',')];
+      const lines = [['Branch/Coy', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark'].join(',')];
       for (const g of abs.groups) for (const i of g.items) lines.push([i.unitName, i.rank, i.name, i.status, i.subType ?? '', i.startDate ?? '', i.endDate ?? '', JSON.stringify(i.remark ?? '')].join(','));
       return new Blob([`\uFEFF${lines.join('\r\n')}`], { type: format === 'csv' ? 'text/csv' : 'application/octet-stream' });
     });
@@ -518,13 +521,14 @@ export class MockApi implements ApiClient {
   }
 
   users(): Promise<UserDto[]> {
-    return this.wait(() => this.data.users.map((u) => ({ id: u.id, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' })));
+    return this.wait(() => this.data.users.map((u) => ({ id: u.id, username: u.username, email: u.email, displayName: u.displayName, role: u.role, unitId: u.unitId, mustChangePassword: false, isActive: true, createdAt: '2026-08-01T00:00:00.000Z' })));
   }
 
   createUser(body: CreateUserBody): Promise<UserDto> {
     return this.wait(() => {
-      if (this.data.users.some((u) => u.email === body.email.toLowerCase())) throw new ApiError('CONFLICT', 'An account with this email already exists', 409);
-      const u = { id: this.newId('u'), email: body.email.toLowerCase(), displayName: body.displayName, role: body.role, unitId: (body.unitId as UnitId | null) ?? null };
+      const username = body.username.trim().toLowerCase();
+      if (this.data.users.some((u) => u.username === username)) throw new ApiError('CONFLICT', 'An account with this username already exists', 409);
+      const u = { id: this.newId('u'), username, email: accountEmail(username), displayName: body.displayName, role: body.role, unitId: (body.unitId as UnitId | null) ?? null };
       this.data.users.push(u);
       return { ...u, mustChangePassword: true, isActive: true, createdAt: this.nowIso() };
     });
@@ -535,6 +539,7 @@ export class MockApi implements ApiClient {
       const u = this.data.users.find((x) => x.id === id);
       if (!u) throw new ApiError('NOT_FOUND', 'User not found', 404);
       if (body.displayName !== undefined) u.displayName = body.displayName;
+      if (body.username !== undefined) u.username = body.username.trim().toLowerCase();
       if (body.unitId !== undefined) u.unitId = body.unitId as UnitId | null;
       return { ...u, mustChangePassword: false, isActive: body.isActive ?? true, createdAt: '2026-08-01T00:00:00.000Z' };
     });

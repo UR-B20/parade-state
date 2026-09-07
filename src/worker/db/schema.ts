@@ -33,6 +33,7 @@ export const platoons = pgTable('platoons', {
 /** One row per Supabase Auth user. The FK to auth.users is added by the Supabase-only migration. */
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey(),
+  username: text('username').notNull(),
   email: text('email').notNull(),
   displayName: text('display_name').notNull(),
   role: roleEnum('role').notNull(),
@@ -43,6 +44,7 @@ export const profiles = pgTable('profiles', {
   updatedAt: updatedAt(),
 }, (t) => [
   uniqueIndex('profiles_email_idx').on(t.email),
+  uniqueIndex('profiles_username_idx').on(t.username),
   check('profiles_commander_has_unit', sql`${t.role} <> 'COMMANDER' OR ${t.unitId} IS NOT NULL`),
 ]);
 

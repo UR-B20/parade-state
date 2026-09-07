@@ -1,72 +1,100 @@
-.login {
+/* Login: full-bleed camo photo, a dark band carrying the white lockup, the card beside it. */
+.login-scene {
+  position: relative;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
+  background: var(--brand-ink);
+  overflow: hidden;
   padding: 24px var(--pad-x) calc(24px + var(--safe-bottom));
-  gap: 20px;
 }
 
-.login__panel {
+.login-scene__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 30% center;
+  opacity: 0.8;
+}
+
+.login-scene__band {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.login-scene__lockup {
+  width: min(70%, 300px);
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+}
+
+.login-scene__lockup img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.login-scene__side {
+  width: 100%;
+}
+
+.login-card {
   width: 100%;
   max-width: 400px;
+  margin: 0 auto;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
-  overflow: hidden;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-}
-
-.login__card {
-  width: 100%;
-  background: var(--surface);
-  padding: 24px var(--pad-x) 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-@media (min-width: 900px) {
-  .login__panel {
-    max-width: 880px;
-    display: grid;
-    grid-template-columns: 1.1fr 1fr;
-    min-height: 520px;
-  }
-
-  .login__card {
-    padding: 40px 36px;
-    justify-content: center;
-  }
-}
-
-.login__brand {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.login__title {
-  font-size: var(--fs-heading);
-  font-weight: 600;
-  letter-spacing: -0.2px;
-}
-
-.login__sub {
-  font-size: var(--fs-body);
-  color: var(--text-2);
-}
-
-.login__form {
+  padding: 28px var(--pad-x) 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
-.login__error {
+.login-card__title {
+  font-size: var(--fs-heading);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  text-align: center;
+}
+
+.login-card__title--caps {
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-size: 22px;
+  color: var(--primary);
+}
+
+.login-card__sub {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  text-align: center;
+}
+
+.login-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.login-card__note {
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  text-align: center;
+}
+
+.login-card__error {
   display: flex;
   gap: 8px;
   align-items: flex-start;
@@ -78,16 +106,49 @@
   font-weight: 500;
 }
 
-.login__demo {
-  width: 100%;
-  max-width: 400px;
+.login-card__demo {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
-.login__demo-title {
-  font-size: var(--fs-small);
+.login-card__demo-title {
+  font-size: var(--fs-xs);
   color: var(--text-2);
   text-align: center;
+}
+
+@media (min-width: 900px) {
+  .login-scene {
+    padding: 0;
+  }
+
+  .login-scene__band {
+    max-width: none;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 48px;
+    padding: 40px clamp(32px, 6vw, 96px);
+    background: rgba(8, 14, 10, 0.6);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .login-scene__lockup {
+    width: min(52vw, 640px);
+  }
+
+  .login-scene__side {
+    width: 380px;
+    flex: none;
+  }
+
+  .login-card {
+    padding: 32px 28px 28px;
+  }
 }

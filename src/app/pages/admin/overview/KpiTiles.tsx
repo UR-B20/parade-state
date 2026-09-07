@@ -52,14 +52,14 @@ export function KpiTiles({ summary, trends, briefing }: { summary: BattalionSumm
         <Tile
           label="Not yet marked"
           value={String(c.unmarked)}
-          sub={awaiting > 0 ? `${awaiting} ${awaiting === 1 ? 'unit' : 'units'} still to submit` : 'Every unit has submitted'}
-          delta={c.unmarked > 0 ? 'Blocks the units from submitting' : '● Everyone marked'}
+          sub={awaiting > 0 ? `${awaiting} ${awaiting === 1 ? 'Branch/Coy' : 'Branches/Coy'} still to submit` : 'Every Branch/Coy has submitted'}
+          delta={c.unmarked > 0 ? 'Blocks those Branches/Coy from submitting' : '● Everyone marked'}
           tone={c.unmarked > 0 ? 'warn' : 'ok'}
         />
       </div>
       <div role="listitem" className="contents">
         <Tile
-          label="Units submitted"
+          label="Branches/Coy submitted"
           value={`${summary.unitsSubmitted} / ${summary.unitsTotal}`}
           sub={`${today.onTime} on time · ${today.late} late`}
           delta={summary.unitsSubmitted === summary.unitsTotal ? '● Report complete' : Date.parse(trends.serverNow) >= Date.parse(summary.event.cutoffAt) ? '▼ Past the cut-off' : '● Before the cut-off'}

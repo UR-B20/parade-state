@@ -26,10 +26,10 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
   const rows = [...summary.units].sort((a, b) => a.unit.sortOrder - b.unit.sortOrder);
   return (
     <div className="table-wrap">
-      <table className="ctable num" aria-label="Units comparison">
+      <table className="ctable num" aria-label="Branches/Coy comparison">
         <thead>
           <tr>
-            <th scope="col" className="ctable__text">Unit</th>
+            <th scope="col" className="ctable__text">Branch/Coy</th>
             <th scope="col">Total</th>
             {COLS.map((c) => (
               <th key={c.key} scope="col">{c.label}</th>
@@ -62,7 +62,7 @@ export function ComparisonTable({ summary, date }: { summary: BattalionSummaryDt
         </tbody>
         <tfoot>
           <tr>
-            <td className="ctable__text">Battalion</td>
+            <td className="ctable__text">15C4I Bn</td>
             <td>{summary.totals.strength}</td>
             {COLS.map((c) => (
               <td key={c.key}>{cell(summary.totals, c.key)}</td>

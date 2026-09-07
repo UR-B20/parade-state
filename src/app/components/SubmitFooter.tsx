@@ -108,7 +108,7 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
           </div>
         ) : (
           <Button variant="primary" block disabled={!canSubmit} busy={busy} onClick={() => setConfirming(true)}>
-            {submitted ? 'Resubmit to S1' : 'Submit to S1'}
+            {submitted ? 'Resubmit to S1 Branch' : 'Submit to S1 Branch'}
           </Button>
         )}
       </div>
@@ -127,13 +127,13 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
 
       <ConfirmDialog
         open={confirming}
-        title={submitted ? 'Resubmit to S1?' : 'Submit to S1?'}
+        title={submitted ? 'Resubmit to S1 Branch?' : 'Submit to S1 Branch?'}
         confirmLabel={submitted ? `Resubmit v${submission.kind === 'SUBMITTED' || submission.kind === 'RESUBMITTED' ? submission.version + 1 : 2}` : 'Submit'}
         busy={busy}
         onConfirm={confirm}
         onCancel={() => setConfirming(false)}
       >
-        <p className="dialog__text">Confirm the present strength before sending it to S1.</p>
+        <p className="dialog__text">Confirm the present strength before sending it to S1 Branch.</p>
         <div className="confirm-figure num">
           <span className="confirm-figure__n">{counts.present}</span>
           <span className="confirm-figure__d">/ {counts.strength} present</span>

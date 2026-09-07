@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useSignOut } from '../api/mutations';
 import { useAuth } from '../state/auth';
 import { useDemo } from '../state/demo';
+import { useTheme, type ThemePref } from '../state/theme';
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { Sheet } from './Sheet';
@@ -30,7 +31,9 @@ export function AccountMenu({ open, onClose }: { open: boolean; onClose: () => v
   const navigate = useNavigate();
   const [controlsOpen, setControlsOpen] = useState(false);
 
-  const roleLabel = user.role === 'ADMIN' ? 'S1 admin' : `Commander`;
+  const theme = useTheme();
+  const roleLabel = user.role === 'ADMIN' ? 'S1 Branch admin' : `Commander`;
+  const prefs: { id: ThemePref; label: string }[] = [{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }, { id: 'system', label: 'Device' }];
 
   return (
     <>
@@ -39,7 +42,15 @@ export function AccountMenu({ open, onClose }: { open: boolean; onClose: () => v
           <span className="avatar">{initialsOf(user.displayName)}</span>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600 }} className="truncate">{user.displayName}</div>
-            <div className="dialog__muted truncate">{roleLabel} · {user.email}</div>
+            <div className="dialog__muted truncate">{roleLabel} · {user.username}</div>
+          </div>
+        </div>
+        <div className="field">
+          <span className="field__label">Appearance</span>
+          <div className="segmented" role="group" aria-label="Appearance">
+            {prefs.map((p) => (
+              <button key={p.id} type="button" className="segmented__option" aria-pressed={theme.pref === p.id} onClick={() => theme.setPref(p.id)}>{p.label}</button>
+            ))}
           </div>
         </div>
         <div className="menu-list">

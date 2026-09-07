@@ -19,7 +19,7 @@ function submittedAt(s: SubmissionState): string {
 }
 
 export function absenteeRows(abs: AbsenteesDto): Cell[][] {
-  const rows: Cell[][] = [['Unit', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark']];
+  const rows: Cell[][] = [['Branch/Coy', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark']];
   for (const g of abs.groups) {
     for (const a of g.items) {
       rows.push([a.unitName, a.rank, a.name, STATUS_LABEL[a.status], a.subType ? SUB_TYPE_LABEL[a.subType] : '', a.startDate ?? '', a.endDate ?? '', a.remark ?? '']);
@@ -33,9 +33,9 @@ export function absenteesCsv(abs: AbsenteesDto): string {
 }
 
 export function paradeStateXlsx(summary: BattalionSummaryDto, abs: AbsenteesDto, generatedAt: Date): Uint8Array {
-  const title = `SoldierTrack parade state · ${summary.event.label} · ${formatSgDateLong(summary.event.date)}`;
+  const title = `15C4I Battalion parade state · ${summary.event.label} · ${formatSgDateLong(summary.event.date)}`;
   const generated = `Generated ${formatSgDateLong(generatedAt.toISOString().slice(0, 10))} ${formatSgTime(generatedAt)} · ${summary.unitsSubmitted} of ${summary.unitsTotal} units submitted`;
-  const header = ['Unit', 'Strength', 'Present', 'MC', 'LL', 'MA', 'RSI', 'Others', 'Unmarked', 'Status', 'Submitted at'];
+  const header = ['Branch/Coy', 'Strength', 'Present', 'MC', 'LL', 'MA', 'RSI', 'Others', 'Unmarked', 'Status', 'Submitted at'];
   const units = [...summary.units].sort((a, b) => a.unit.sortOrder - b.unit.sortOrder);
   const summaryRows: Cell[][] = [
     [title],

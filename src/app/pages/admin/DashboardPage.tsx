@@ -108,7 +108,7 @@ export function DashboardPage() {
   return (
     <div className="page">
       <AppHeader
-        title="Battalion"
+        title="15C4I Battalion"
         meta={formatSgDateLong(date)}
         wide
         actions={
@@ -135,7 +135,7 @@ export function DashboardPage() {
           activeId={tab}
           items={[
             { id: 'overview', label: 'Overview', to: `/admin${query}` },
-            { id: 'units', label: 'Units', count: summary?.unitsTotal, to: `/admin/units${query}` },
+            { id: 'units', label: 'Branches/Coy', count: summary?.unitsTotal, to: `/admin/units${query}` },
             { id: 'absentees', label: 'Absentees', count: summary?.totals.absent, to: `/admin/absentees${query}` },
           ]}
         />
@@ -150,7 +150,7 @@ export function DashboardPage() {
                 counts={summary.totals}
                 report={
                   <StatusPill tone={summary.unitsSubmitted === summary.unitsTotal ? 'ok' : cutoff?.passed ? 'danger' : 'pending'} dot>
-                    {summary.unitsSubmitted} of {summary.unitsTotal} units submitted
+                    {summary.unitsSubmitted} of {summary.unitsTotal} submitted
                   </StatusPill>
                 }
                 cutoff={cutoff}
@@ -214,7 +214,7 @@ export function DashboardPage() {
               ) : absenteesQ.isError || !absenteesQ.data ? (
                 <EmptyState icon="alert" title="Couldn't load absentees" action={<Button onClick={() => absenteesQ.refetch()}>Try again</Button>} />
               ) : absenteesQ.data.total === 0 ? (
-                <div className="roll"><EmptyState icon="check" title="No absentees" text="Everyone in the battalion is present for this event." /></div>
+                <div className="roll"><EmptyState icon="check" title="No absentees" text="Everyone in 15C4I Battalion is present for this event." /></div>
               ) : (
                 <AbsenteeList data={absenteesQ.data} />
               )

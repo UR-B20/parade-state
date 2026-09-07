@@ -91,7 +91,7 @@ export function useSignIn() {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { email: string; password: string }) => api.signIn(v.email, v.password),
+    mutationFn: (v: { login: string; password: string }) => api.signIn(v.login, v.password),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
   });
 }

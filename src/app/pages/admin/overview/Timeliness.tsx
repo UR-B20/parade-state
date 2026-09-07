@@ -39,12 +39,12 @@ export function Timeliness({ trends }: { trends: TrendsDto }) {
   return (
     <ChartCard
       title="Reporting discipline"
-      subtitle={`Submissions against the cut-off over the last ${recorded} parades · ${slow === 0 ? 'no slips' : `${slow} ${slow === 1 ? 'unit' : 'units'} with a late or missed report`}`}
-      table={<DataTable caption="Reporting discipline" head={['Unit', 'On time', 'Late', 'Missed', 'Pending today']} rows={units.map((u) => [u.unitName, u.onTime, u.late, u.missed, u.pending])} />}
+      subtitle={`Submissions against the cut-off over the last ${recorded} parades · ${slow === 0 ? 'no slips' : `${slow} ${slow === 1 ? 'Branch/Coy' : 'Branches/Coy'} with a late or missed report`}`}
+      table={<DataTable caption="Reporting discipline" head={['Branch/Coy', 'On time', 'Late', 'Missed', 'Pending today']} rows={units.map((u) => [u.unitName, u.onTime, u.late, u.missed, u.pending])} />}
       footer={<LegendRow items={series.map((s) => ({ label: s.label, color: s.color }))} />}
     >
       <div style={{ height: 24 + units.length * 30 }} className="w-full">
-        <Bar data={data} options={options} aria-label="Reporting discipline by unit" role="img" />
+        <Bar data={data} options={options} aria-label="Reporting discipline by Branch/Coy" role="img" />
       </div>
     </ChartCard>
   );

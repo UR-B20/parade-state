@@ -94,7 +94,7 @@ export async function createHarness(envOverrides: Partial<Bindings> = {}): Promi
     },
     seedUser: async ({ id, email, role, unitId = null, displayName, isActive = true }) => {
       const uid = id ?? `00000000-0000-4000-8000-${String(userSeq++).padStart(12, '0')}`;
-      await t.raw.insert(profiles).values({ id: uid, email, displayName: displayName ?? email, role, unitId: role === 'COMMANDER' ? unitId : null, isActive });
+      await t.raw.insert(profiles).values({ id: uid, username: email.split('@')[0]!.toLowerCase(), email, displayName: displayName ?? email, role, unitId: role === 'COMMANDER' ? unitId : null, isActive });
       return uid;
     },
     close: t.close,
