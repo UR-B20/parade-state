@@ -6,6 +6,8 @@ import { getEvent } from '../services/events';
 import { getSettings } from '../services/settings';
 import { absentees, battalionSummary } from '../services/summary';
 import { battalionTrends } from '../services/trends';
+import { monthlyExportXlsx } from '../services/monthlyExport';
+import { isMonth } from '@shared/export/monthly';
 
 export const adminRoutes = new Hono<AppEnv>();
 adminRoutes.use('*', requireAuth, requireAdmin);
@@ -28,6 +30,16 @@ adminRoutes.get('/absentees/:eventId', async (c) => {
   const db = c.get('db');
   const event = await getEvent(db, c.req.param('eventId'), await getSettings(db));
   return c.json(await absentees(db, c.env, event, c.get('realNow')));
+});
+
+adminRoutes.get('/export/month/:file', async (c) => {
+  const m = /^(\d{4}-\d{2})\.xlsx$/.exec(c.req.param('file'));
+  if (!m || !isMonth(m[1]!)) throw notFound('Export');
+  const bytes = await monthlyExportXlsx(c.get('db'), m[1]!, c.get('realNow'));
+  return c.body(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, 200, {
+    'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'content-disposition': `attachment; filename="parade-state-${m[1]}.xlsx"`,
+  });
 });
 
 adminRoutes.get('/export/:file', async (c) => {

@@ -28,6 +28,8 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
   keeps running. **Back to Present** ends the absence from today.
 - Saving is automatic. Submitting snapshots the unit's attendance as a version; further changes
   show as "changes since submission" until the unit **resubmits**.
+- S1 exports one event (Excel summary plus absentees, or CSV) or a **whole month** as one
+  workbook: the battalion by day, each Branch/Coy by day and every absentee, as submitted.
 - **Ad hoc events** created by S1 are pre-filled from each unit's last submitted parade state
   on or before that date. AM and PM parades start unmarked. Once an ad hoc event is over, S1
   can **archive** it from the dashboard: it disappears from every event picker but keeps its

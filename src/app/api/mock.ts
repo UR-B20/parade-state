@@ -15,6 +15,7 @@ import {
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
 import { accountEmail } from '@shared/accounts';
+import { monthlyXlsx } from '@shared/export/monthly';
 import { ApiError, type ApiClient, type BootstrapBody, type CreateAdhocBody, type DemoAccount, type CreatePersonBody, type CreateUserBody, type UpdatePersonBody, type UpdateUserBody } from './client';
 
 const LATENCY_MS = 220;
@@ -560,6 +561,24 @@ export class MockApi implements ApiClient {
       const lines = [['Branch/Coy', 'Rank', 'Name', 'Status', 'Sub-type', 'Start', 'End', 'Remark'].join(',')];
       for (const g of abs.groups) for (const i of g.items) lines.push([i.unitName, i.rank, i.name, statusLabel(i.status, i.halfDay), i.subType ?? '', i.startDate ?? '', i.endDate ?? '', JSON.stringify(i.remark ?? '')].join(','));
       return new Blob([`\uFEFF${lines.join('\r\n')}`], { type: format === 'csv' ? 'text/csv' : 'application/octet-stream' });
+    });
+  }
+
+  downloadMonth(month: string): Promise<Blob> {
+    return this.wait(() => {
+      const events = [
+        ...this.data.events.map((e) => ({ id: e.id, date: e.date, type: e.type, label: this.eventLabel(e.type, null), cutoffAt: e.cutoffAt, createdAt: sgLocalToIso(e.date, '00:00') })),
+        ...this.adhoc.map((e) => ({ id: e.id, date: e.date, type: e.type, label: e.label, cutoffAt: e.cutoffAt, createdAt: sgLocalToIso(e.date, '00:01') })),
+      ].filter((e) => e.date.startsWith(month));
+      const ids = new Set(events.map((e) => e.id));
+      const bytes = monthlyXlsx({
+        month,
+        units: this.data.units.map((u) => ({ id: u.id, name: u.name, sortOrder: u.sortOrder })),
+        events,
+        submissions: this.data.submissions.filter((s) => ids.has(s.eventId) && s.submittedAt <= this.nowIso()).map((s) => ({ unitId: s.unitId, eventId: s.eventId, version: s.version, submittedAt: s.submittedAt, counts: s.counts, snapshot: s.snapshot })),
+        generatedAt: this.now(),
+      });
+      return new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     });
   }
 

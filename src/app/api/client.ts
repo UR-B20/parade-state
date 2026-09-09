@@ -52,6 +52,8 @@ export interface ApiClient {
   absentees(eventId: string): Promise<AbsenteesDto>;
   exportUrl(eventId: string, format: 'xlsx' | 'csv'): string;
   download(eventId: string, format: 'xlsx' | 'csv'): Promise<Blob>;
+  /** S1 only: every parade of a month ('YYYY-MM') as one Excel workbook. */
+  downloadMonth(month: string): Promise<Blob>;
 
   notifications(): Promise<NotificationsDto>;
   markNotificationsRead(ids: string[] | 'all'): Promise<void>;

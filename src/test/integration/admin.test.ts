@@ -87,6 +87,29 @@ describe('export', () => {
     expect(lines.some((l) => l.includes('Coy 1,CPL,Daniel Tan,MC,,2026-09-05,2026-09-08,"Fever, Bedok Polyclinic"'))).toBe(true);
   });
 
+  it('the monthly XLSX lists every parade of the month as submitted', async () => {
+    expect((await h.request('/admin/export/month/2026-13.xlsx', { as: admin })).status).toBe(404);
+    expect((await h.request('/admin/export/month/2026-09.xlsx', { as: cdr1 })).status).toBe(403);
+    const res = await h.request('/admin/export/month/2026-09.xlsx', { as: admin });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="parade-state-2026-09.xlsx"');
+    const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
+    const workbook = strFromU8(files['xl/workbook.xml']!);
+    expect(workbook).toContain('name="Battalion by day"');
+    expect(workbook).toContain('name="Branches by day"');
+    expect(workbook).toContain('name="Absentees"');
+    const byDay = strFromU8(files['xl/worksheets/sheet1.xml']!);
+    // 1–5 Sep: AM parades from the demo history, plus 6 Sep AM (7 of 9) and PM (nobody yet). No Roll Call rows without submissions.
+    expect(byDay).toContain('<t xml:space="preserve">2026-09-05</t>');
+    expect(byDay).toContain('<t xml:space="preserve">7 of 9</t>');
+    expect(byDay).not.toContain('Roll call');
+    const byUnit = strFromU8(files['xl/worksheets/sheet2.xml']!);
+    expect(byUnit).toContain('<t xml:space="preserve">Not submitted</t>');
+    expect(byUnit).toContain('<t xml:space="preserve">Coy 1</t>');
+    const absentees = strFromU8(files['xl/worksheets/sheet3.xml']!);
+    expect(absentees).toContain('<t xml:space="preserve">Daniel Tan</t>');
+  });
+
   it('XLSX is a valid workbook with Summary and Absentees sheets', async () => {
     const res = await h.request(`/admin/export/${AM}.xlsx`, { as: admin });
     expect(res.status).toBe(200);

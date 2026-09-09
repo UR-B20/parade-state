@@ -84,7 +84,16 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1;
+  /* Content-sized basis: Safari resolves a 0% basis against the sheet's indefinite height
+     and collapses the body to a sliver. min-height 0 lets it shrink and scroll instead. */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Rows inside the body keep their height; only the body scrolls. Without this a scrollable
+   row (the quick-date chips) is squashed when the sheet is taller than the screen. */
+.dialog__body > * {
+  flex-shrink: 0;
 }
 
 .dialog__footer {

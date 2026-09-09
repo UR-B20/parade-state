@@ -3,7 +3,7 @@ import { ABSENCE_STATUSES, STATUS_LABEL, statusLabel, SUB_TYPE_LABEL } from '@sh
 import { STATUS_COUNT_KEY } from '@shared/domain';
 import type { AbsenteesDto, BattalionSummaryDto, SubmissionState } from '@shared/types';
 import { toCsv } from './csv';
-import { buildXlsx, type Cell } from './xlsx';
+import { buildXlsx, type Cell } from '@shared/export/xlsx';
 
 function stateText(s: SubmissionState): string {
   switch (s.kind) {

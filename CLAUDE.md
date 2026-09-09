@@ -202,6 +202,12 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   Others sub-types) and the daily Roll Call added; migration 0006 (enum values added, events
   cut-off nullable, `status_spans.half_day`). New enum values are referenced only as text in
   the migration because the migrator runs all pending migrations in one transaction.
+- 9 Sep: monthly export (`GET /admin/export/month/YYYY-MM.xlsx`, builder in
+  `src/shared/export/monthly.ts`, shared with the mock; xlsx writer moved to
+  `src/shared/export/xlsx.ts`), ad hoc archiving, and two sheet fixes: `.dialog__body` uses
+  `flex: 1 1 auto; min-height: 0` (Safari collapsed a 0% basis against the sheet's indefinite
+  height, shrinking the Add person sheet to a sliver) and body children have `flex-shrink: 0`
+  (the quick-date chip row was squashed on tall sheets).
 - Next: optional Hyperdrive on the session pooler; custom domain; otherwise maintenance.
 - A Supabase MCP server entry exists in `.mcp.json` for local use; it needs a browser sign-in
   and does not work in remote sessions.

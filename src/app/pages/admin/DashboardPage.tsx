@@ -196,7 +196,7 @@ export function DashboardPage() {
                 <>
                   <ComparisonTable summary={summary} date={date} />
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    {eventId && <ExportMenu eventId={eventId} fileStem={fileStem} inline />}
+                    {eventId && <ExportMenu eventId={eventId} fileStem={fileStem} date={date} inline />}
                   </div>
                 </>
               ) : (
@@ -244,7 +244,7 @@ export function DashboardPage() {
         </div>
         )}
 
-        {!wide && tab !== 'overview' && eventId && <ExportMenu eventId={eventId} fileStem={fileStem} />}
+        {!wide && tab !== 'overview' && eventId && <ExportMenu eventId={eventId} fileStem={fileStem} date={date} />}
       </main>
 
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} data={notifQ.data} today={today} />

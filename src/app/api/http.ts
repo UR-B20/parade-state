@@ -116,8 +116,16 @@ export class HttpApi implements ApiClient {
   absentees(eventId: string) { return this.call<AbsenteesDto>(`/admin/absentees/${eventId}`); }
   exportUrl(eventId: string, format: 'xlsx' | 'csv') { return `/api/admin/export/${eventId}.${format}`; }
   async download(eventId: string, format: 'xlsx' | 'csv'): Promise<Blob> {
+    return this.fetchBlob(this.exportUrl(eventId, format));
+  }
+
+  async downloadMonth(month: string): Promise<Blob> {
+    return this.fetchBlob(`/api/admin/export/month/${month}.xlsx`);
+  }
+
+  private async fetchBlob(url: string): Promise<Blob> {
     const token = await this.token();
-    const res = await fetch(this.exportUrl(eventId, format), { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(url, { headers: token ? { authorization: `Bearer ${token}` } : {} });
     if (!res.ok) throw new ApiError('INTERNAL', 'Export failed', res.status);
     return res.blob();
   }
