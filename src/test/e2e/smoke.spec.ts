@@ -26,6 +26,10 @@ test.describe('SoldierTrack', () => {
     await expect(page.getByRole('button', { name: /^Absent/ })).toContainText('7');
     await expect(page.getByText(/Mark everyone before submitting · 10 left/)).toBeVisible();
 
+    // With a platoon selected the bulk button covers that platoon only; back to the whole Coy for the rest.
+    await page.getByRole('button', { name: /^Platoon 1/ }).first().click();
+    await expect(page.getByRole('button', { name: /Mark remaining \d+ in Platoon 1 Present/ })).toBeVisible();
+    await page.getByRole('button', { name: /^Whole Coy/ }).first().click();
     // One tap Present on the first unmarked row, then mark the rest Present in bulk.
     await page.getByRole('button', { name: /^Not yet marked/ }).click();
     await page.locator('.person--unmarked').first().getByRole('button', { name: 'Present', exact: true }).click();

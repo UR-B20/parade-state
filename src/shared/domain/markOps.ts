@@ -27,9 +27,23 @@ export interface MarkPlan {
   upsertPresentMark: boolean;
 }
 
-/** Ids of everyone still unmarked, for the "Mark remaining Present" bulk action. */
-export function planMarkRemainingPresent(statuses: readonly { personId: string; status: string }[]): string[] {
-  return statuses.filter((s) => s.status === 'UNMARKED').map((s) => s.personId);
+/** Which personnel a bulk mark covers: everyone, one platoon, or those without a platoon. */
+export interface BulkScope {
+  /** A platoon id, or null for personnel with no platoon (or one the unit no longer has). */
+  platoonId: string | null;
+  unitPlatoonIds: readonly string[];
+}
+
+export function inBulkScope(person: { platoonId?: string | null }, scope: BulkScope | undefined): boolean {
+  if (!scope) return true;
+  const pid = person.platoonId ?? null;
+  if (scope.platoonId === null) return pid === null || !scope.unitPlatoonIds.includes(pid);
+  return pid === scope.platoonId;
+}
+
+/** Ids of everyone still unmarked (within the scope), for the "Mark remaining Present" bulk action. */
+export function planMarkRemainingPresent(statuses: readonly { personId: string; status: string; platoonId?: string | null }[], scope?: BulkScope): string[] {
+  return statuses.filter((s) => s.status === 'UNMARKED' && inBulkScope(s, scope)).map((s) => s.personId);
 }
 
 export class MarkValidationError extends Error {

@@ -42,7 +42,8 @@ export interface ApiClient {
   unitAttendance(unitId: string, eventId: string): Promise<UnitAttendanceDto>;
   mark(unitId: string, eventId: string, personId: string, body: MarkBody): Promise<MarkResultDto>;
   /** Marks everyone still unmarked as Present. */
-  markRemainingPresent(unitId: string, eventId: string): Promise<UnitAttendanceDto>;
+  /** `platoonId`: a platoon to limit the bulk mark to, null for personnel without a platoon, undefined for everyone. */
+  markRemainingPresent(unitId: string, eventId: string, platoonId?: string | null): Promise<UnitAttendanceDto>;
   submit(unitId: string, eventId: string): Promise<SubmissionDto>;
   submissions(unitId: string, eventId: string): Promise<SubmissionDto[]>;
 

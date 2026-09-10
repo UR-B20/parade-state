@@ -65,7 +65,9 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
 
 - Explicit marking: every person is marked Present or Not present. Unmarked people are a
   separate bucket ("Not yet marked"), counted in neither present nor absent. Submit to S1 is
-  blocked while anyone is unmarked; "Mark remaining Present" bulk-marks after a confirmation.
+  blocked while anyone is unmarked; "Mark remaining Present" bulk-marks after a confirmation,
+  scoped to the selected platoon when one is picked (`POST …/mark-remaining-present` body
+  `{ platoonId }`: a platoon id, null for personnel without a platoon, omitted for everyone).
 - Absence reasons (display order): LL (Local leave), OFF, RSI (Report sick inside), RSO
   (Report sick outside), MC, MA, HL (Hospitalisation leave), OL (Overseas leave), Others.
   Others needs a sub-type: VOC, SOC, ATP/CS (`ATP_CS`), Meeting, On course (`COURSE`), Duty,

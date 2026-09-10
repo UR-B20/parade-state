@@ -178,6 +178,24 @@ describe('attendance', () => {
     expect((await mark(AM, ryan, { action: 'BACK_TO_PRESENT' })).body.person.status).toBe('PRESENT');
   });
 
+  it('marks the remaining Present for one platoon only, or for those without a platoon', async () => {
+    const [amir, ryan, daniel] = [people['Amir Rahman']!.id, people['Ryan Lim']!.id, people['Daniel Tan']!.id];
+    await h.json(`/units/COY1/personnel/${ryan}`, { method: 'PATCH', as: cdr1, json: { platoonId: 'COY1-P1' } });
+    await h.json(`/units/COY1/personnel/${daniel}`, { method: 'PATCH', as: cdr1, json: { platoonId: 'COY1-P2' } });
+    const day = '2026-09-08-AM';
+    expect((await attendance(day)).body.counts.unmarked).toBe(3);
+    expect((await h.request(`/units/COY1/attendance/${day}/mark-remaining-present`, { method: 'POST', as: cdr1, json: { platoonId: 'COY2-P1' } })).status).toBe(400);
+    const p1 = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${day}/mark-remaining-present`, { method: 'POST', as: cdr1, json: { platoonId: 'COY1-P1' } });
+    expect(p1.status).toBe(200);
+    expect(Object.fromEntries(p1.body.persons.map((p) => [p.name, p.status]))).toEqual({ 'Ryan Lim': 'PRESENT', 'Daniel Tan': 'UNMARKED', 'Amir Rahman': 'UNMARKED' });
+    const none = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${day}/mark-remaining-present`, { method: 'POST', as: cdr1, json: { platoonId: null } });
+    expect(Object.fromEntries(none.body.persons.map((p) => [p.name, p.status]))).toEqual({ 'Ryan Lim': 'PRESENT', 'Daniel Tan': 'UNMARKED', 'Amir Rahman': 'PRESENT' });
+    const all = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${day}/mark-remaining-present`, { method: 'POST', as: cdr1, json: {} });
+    expect(all.body.counts.unmarked).toBe(0);
+    for (const id of [ryan, daniel]) await h.json(`/units/COY1/personnel/${id}`, { method: 'PATCH', as: cdr1, json: { platoonId: null } });
+    void amir;
+  });
+
   it('validates mark bodies', async () => {
     const ryan = people['Ryan Lim']!.id;
     expect((await mark(AM, ryan, { action: 'SET', status: 'OTHERS', startDate: '2026-09-06', endDate: null })).status).toBe(400);

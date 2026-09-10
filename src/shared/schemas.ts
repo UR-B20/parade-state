@@ -36,6 +36,11 @@ export const MarkBodySchema = v.variant('action', [
   }),
 ]);
 
+/** Scope for "Mark remaining Present": omitted = everyone, a platoon id = that platoon, null = personnel without a platoon. */
+export const MarkRemainingSchema = v.object({
+  platoonId: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(40)))),
+});
+
 export const CreatePersonSchema = v.object({
   rank: RankSchema,
   name: NameSchema,

@@ -21,7 +21,8 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
   applies to the parade in that half; the person stays "Not yet marked" at the other parade
   until marked. At the Roll Call (which has no time) the half-day reason is shown.
 - **Submit to S1** is only possible once everyone is marked. **Mark remaining Present** marks
-  everyone still unmarked in one confirmed step.
+  everyone still unmarked in one confirmed step; with a platoon selected it covers that
+  platoon only.
 - **LL, OFF, MC, MA, HL, OL and Others** can span several days and keep applying on later
   parades with nothing to re-enter. **RSI and RSO** apply to the selected day only.
 - Choosing **Present** for someone with an ongoing absence marks this event only; the absence

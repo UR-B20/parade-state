@@ -69,7 +69,7 @@ export function useMarkRemainingPresent(unitId: string, eventId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.markRemainingPresent(unitId, eventId),
+    mutationFn: (scope: { platoonId?: string | null } = {}) => api.markRemainingPresent(unitId, eventId, scope.platoonId),
     onSuccess: (dto) => qc.setQueryData<UnitAttendanceDto>(keys.attendance(unitId, eventId), dto),
   });
 }

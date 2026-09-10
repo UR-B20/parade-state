@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { IsoDate } from '@shared/dates';
 import {
   contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, eventHalf, MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, unitCounts,
-  type SpanRow,
+  type BulkScope, type SpanRow,
 } from '@shared/domain';
 import type { HalfDay } from '@shared/statuses';
 import type { ChangeDiff, EffectiveStatus, MarkBody, MarkResultDto, SubmissionState, UnitAttendanceDto, UnitCounts, UnitDto } from '@shared/types';
@@ -150,10 +150,20 @@ export async function applyMark(db: Db, env: Bindings, unitId: string, event: Ev
   return { person: row, counts, submission: sub.state, changes: sub.changes, updatedAt: realNow.toISOString(), contentHash: hash };
 }
 
-/** Marks everyone still unmarked as Present in one transaction and returns the refreshed view. */
-export async function markRemainingPresent(db: Db, env: Bindings, unitId: string, event: EventRow, user: ProfileRow, realNow: Date): Promise<UnitAttendanceDto> {
+/**
+ * Marks everyone still unmarked as Present in one transaction and returns the refreshed view.
+ * `platoonId` narrows it to one platoon (null: personnel without a platoon); undefined means the whole unit.
+ */
+export async function markRemainingPresent(db: Db, env: Bindings, unitId: string, event: EventRow, user: ProfileRow, realNow: Date, platoonId?: string | null): Promise<UnitAttendanceDto> {
+  let scope: BulkScope | undefined;
+  if (platoonId !== undefined) {
+    const unit = await getUnit(db, unitId);
+    const unitPlatoonIds = unit.platoons.map((p) => p.id);
+    if (platoonId !== null && !unitPlatoonIds.includes(platoonId)) throw validation('Choose a platoon of this unit', { field: 'platoonId' });
+    scope = { platoonId, unitPlatoonIds };
+  }
   const { statuses } = await computeUnit(db, unitId, event);
-  const ids = planMarkRemainingPresent(statuses);
+  const ids = planMarkRemainingPresent(statuses, scope);
   if (ids.length > 0) {
     await db.transaction(async (tx) => {
       await tx.insert(eventMarks).values(ids.map((personId) => ({ eventId: event.id, personId, unitId, markedBy: user.id, markedAt: realNow }))).onConflictDoNothing();

@@ -405,7 +405,7 @@ export class MockApi implements ApiClient {
     });
   }
 
-  markRemainingPresent(unitId: string, eventId: string): Promise<UnitAttendanceDto> {
+  markRemainingPresent(unitId: string, eventId: string, platoonId?: string | null): Promise<UnitAttendanceDto> {
     return this.wait(async () => {
       const unit = this.unit(unitId);
       const event = this.eventById(eventId);
@@ -413,8 +413,10 @@ export class MockApi implements ApiClient {
       if (user.role !== 'ADMIN' && isDateLocked(event.date, this.today(), this.unlocks, this.now())) {
         throw new ApiError('DATE_LOCKED', 'This date is locked. Ask S1 Branch to unlock it to make corrections.', 403);
       }
+      const unitPlatoonIds = unit.platoons.map((p) => p.id);
+      if (typeof platoonId === 'string' && !unitPlatoonIds.includes(platoonId)) throw new ApiError('VALIDATION', 'Choose a platoon of this unit', 400, { field: 'platoonId' });
       const { statuses } = this.computeUnit(unitId, event);
-      const ids = planMarkRemainingPresent(statuses);
+      const ids = planMarkRemainingPresent(statuses, platoonId === undefined ? undefined : { platoonId, unitPlatoonIds });
       for (const personId of ids) this.data.marks.push({ eventId, personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
       if (ids.length) this.touch(unit.id, eventId, user.id);
       return this.unitAttendance(unitId, eventId);

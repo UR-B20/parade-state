@@ -106,7 +106,7 @@ export class HttpApi implements ApiClient {
 
   unitAttendance(unitId: string, eventId: string) { return this.call<UnitAttendanceDto>(`/units/${unitId}/attendance/${eventId}`); }
   mark(unitId: string, eventId: string, personId: string, body: MarkBody) { return this.call<MarkResultDto>(`/units/${unitId}/attendance/${eventId}/persons/${personId}`, { method: 'PUT', json: body }); }
-  markRemainingPresent(unitId: string, eventId: string) { return this.call<UnitAttendanceDto>(`/units/${unitId}/attendance/${eventId}/mark-remaining-present`, { method: 'POST' }); }
+  markRemainingPresent(unitId: string, eventId: string, platoonId?: string | null) { return this.call<UnitAttendanceDto>(`/units/${unitId}/attendance/${eventId}/mark-remaining-present`, { method: 'POST', json: platoonId === undefined ? {} : { platoonId } }); }
   submit(unitId: string, eventId: string) { return this.call<SubmissionDto>(`/units/${unitId}/submissions/${eventId}`, { method: 'POST' }); }
   submissions(unitId: string, eventId: string) { return this.call<SubmissionDto[]>(`/units/${unitId}/submissions/${eventId}`); }
 

@@ -18,8 +18,10 @@ interface SubmitFooterProps {
   locked: boolean;
   busy?: boolean;
   bulkBusy?: boolean;
+  /** When a platoon is selected on the page, the bulk mark covers only that platoon. */
+  bulkScope?: { label: string; unmarked: number } | null;
   onSubmit: () => Promise<unknown>;
-  /** Marks everyone still unmarked as Present. */
+  /** Marks everyone still unmarked (in the selected scope) as Present. */
   onMarkRemainingPresent: () => Promise<unknown>;
 }
 
@@ -28,7 +30,7 @@ function tupleLabel(t: StatusTuple | null): string {
   return t.status === 'UNMARKED' ? UNMARKED_LABEL : STATUS_LABEL[t.status];
 }
 
-export function SubmitFooter({ submission, counts, changes, updatedAt, save, locked, busy, bulkBusy, onSubmit, onMarkRemainingPresent }: SubmitFooterProps) {
+export function SubmitFooter({ submission, counts, changes, updatedAt, save, locked, busy, bulkBusy, bulkScope, onSubmit, onMarkRemainingPresent }: SubmitFooterProps) {
   const [confirming, setConfirming] = useState(false);
   const [confirmingBulk, setConfirmingBulk] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
@@ -36,6 +38,9 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
   const submitted = submission.kind === 'SUBMITTED' || submission.kind === 'RESUBMITTED';
   const hasChanges = submitted && submission.hasChanges;
   const unmarked = counts.unmarked;
+  /** Figures for the bulk button: the selected platoon, or the whole unit. */
+  const bulkN = bulkScope ? bulkScope.unmarked : unmarked;
+  const scopeSuffix = bulkScope ? ` in ${bulkScope.label}` : '';
   const canSubmit = save.status === 'saved' && !locked && unmarked === 0 && (!submitted || hasChanges);
 
   let statusLine: { text: string; tone?: 'warn' | 'danger' } = { text: '' };
@@ -94,10 +99,10 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
           </ul>
         )}
 
-        {unmarked > 0 && !locked && (
+        {bulkN > 0 && !locked && (
           <Button variant="secondary" block disabled={save.status === 'offline'} busy={bulkBusy} onClick={() => setConfirmingBulk(true)}>
             <Icon name="check" size={18} />
-            Mark remaining {unmarked} Present
+            Mark remaining {bulkN}{scopeSuffix} Present
           </Button>
         )}
 
@@ -115,13 +120,13 @@ export function SubmitFooter({ submission, counts, changes, updatedAt, save, loc
 
       <ConfirmDialog
         open={confirmingBulk}
-        title={`Mark ${unmarked} ${unmarked === 1 ? 'person' : 'people'} Present?`}
-        confirmLabel={`Mark ${unmarked} Present`}
+        title={`Mark ${bulkN} ${bulkN === 1 ? 'person' : 'people'}${scopeSuffix} Present?`}
+        confirmLabel={`Mark ${bulkN} Present`}
         busy={bulkBusy}
         onConfirm={confirmBulk}
         onCancel={() => setConfirmingBulk(false)}
       >
-        <p className="dialog__text">Everyone not yet marked will be recorded as Present for this event.</p>
+        <p className="dialog__text">{bulkScope ? `Everyone in ${bulkScope.label} not yet marked will be recorded as Present for this event. The rest of the unit is left as it is.` : 'Everyone not yet marked will be recorded as Present for this event.'}</p>
         <p className="dialog__muted">Mark anyone who is absent first, so they are not swept in. You can still change a person afterwards.</p>
       </ConfirmDialog>
 

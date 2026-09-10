@@ -132,10 +132,11 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
     );
   };
 
+  const bulkScope = platoon === ALL_PLATOONS || !scopeCounts || !scopeLabel ? null : { label: scopeLabel, unmarked: scopeCounts.unmarked };
   const onMarkRemainingPresent = async () => {
     try {
-      const dto = await bulk.mutateAsync();
-      toast.show(`Everyone marked · ${dto.counts.present} present`);
+      const dto = await bulk.mutateAsync(platoon === ALL_PLATOONS ? {} : { platoonId: platoon === NO_PLATOON ? null : platoon });
+      toast.show(bulkScope ? `${bulkScope.label} marked · ${dto.counts.present} present in the unit` : `Everyone marked · ${dto.counts.present} present`);
     } catch (err) {
       toast.show(err instanceof ApiError ? err.message : "Couldn't mark the remaining personnel.", { tone: 'error' });
       throw err;
@@ -297,6 +298,7 @@ export function MarkPage({ unitId: unitIdProp }: { unitId?: string } = {}) {
           locked={data.locked}
           busy={submit.isPending}
           bulkBusy={bulk.isPending}
+          bulkScope={bulkScope}
           onSubmit={onSubmit}
           onMarkRemainingPresent={onMarkRemainingPresent}
         />
