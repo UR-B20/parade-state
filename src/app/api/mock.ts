@@ -10,7 +10,7 @@ import type {
   SettingsDto, SubmissionDto, SubmissionState, TrendsDto, UnitAttendanceDto, UnitDto, UnitId, UserDto,
 } from '@shared/types';
 import {
-  awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, eventHalf, isDateLocked, spanCoversEvent,
+  awaitingRank, contentHash, deriveSubmissionState, diffAgainstSnapshot, effectiveStatuses, eventHalf, isDateLocked, reportedStatuses, spanCoversEvent,
   MarkValidationError, planMark, planMarkRemainingPresent, platoonBreakdown, toSnapshot, unitCounts, sumCounts, buildTrends, trendDates, type SnapshotEntry, type SpanRow, type TrendSubmission,
 } from '@shared/domain';
 import { buildDemoDataset, type DemoDataset, type DemoSpan } from '@shared/demo/dataset';
@@ -269,20 +269,6 @@ export class MockApi implements ApiClient {
     return this.wait(() => {
       const ev: MockAdhoc = { id: `${body.date}-X-${this.newId('ev')}`, date: body.date, type: 'ADHOC', name: body.name, cutoffAt: sgLocalToIso(body.date, body.cutoffTime), label: body.name, archivedAt: null };
       this.adhoc.push(ev);
-      // Pre-fill from each unit's last submitted parade state on or before this date.
-      const user = this.currentUser();
-      for (const unit of this.data.units) {
-        const latest = this.data.submissions
-          .filter((s) => s.unitId === unit.id && this.eventById(s.eventId).date <= ev.date && s.submittedAt <= this.nowIso())
-          .sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1))[0];
-        if (!latest) continue;
-        const active = this.prefillCandidates(unit.id, ev);
-        for (const entry of latest.snapshot) {
-          if (entry.status === 'PRESENT' && active.has(entry.personId)) {
-            this.data.marks.push({ eventId: ev.id, personId: entry.personId, unitId: unit.id, markedBy: user.id, markedAt: this.nowIso() });
-          }
-        }
-      }
       return ev;
     });
   }
@@ -460,14 +446,22 @@ export class MockApi implements ApiClient {
     return this.wait(() => this.buildSummary(this.eventById(eventId)));
   }
 
+  /** S1's view of a unit: live for parades and the Roll Call, submitted figures only for ad hoc events. */
+  private reportedFor(unitId: UnitId, event: EventDto) {
+    const { statuses } = this.computeUnit(unitId, event);
+    const latest = this.data.submissions.filter((s) => s.unitId === unitId && s.eventId === event.id).sort((a, b) => b.version - a.version)[0];
+    return reportedStatuses(event, statuses, latest?.snapshot ?? null);
+  }
+
   private async buildSummary(event: EventDto): Promise<BattalionSummaryDto> {
     const rows = [];
     for (const u of this.data.units) {
       const unit = this.unit(u.id);
-      const { statuses, counts } = this.computeUnit(unit.id, event);
+      const { statuses } = this.computeUnit(unit.id, event);
       const hash = await contentHash(statuses);
       const sub = await this.submissionFor(unit.id, event, hash);
-      rows.push({ unit, counts, submission: sub.state, platoons: platoonBreakdown(statuses, unit.platoons) });
+      const reported = this.reportedFor(unit.id, event);
+      rows.push({ unit, counts: unitCounts(reported), submission: sub.state, platoons: platoonBreakdown(reported, unit.platoons) });
     }
     if (!event.archivedAt) this.ensureLateNotifications(event);
     rows.sort((a, b) => awaitingRank(a.submission) - awaitingRank(b.submission) || a.unit.sortOrder - b.unit.sortOrder);
@@ -499,7 +493,7 @@ export class MockApi implements ApiClient {
         units: this.data.units.map((u) => ({ id: u.id, name: u.name, sortOrder: u.sortOrder })),
         ...this.loadPast(event, days),
         today: { units: summary.units, totals: summary.totals, unitsSubmitted: summary.unitsSubmitted, unitsTotal: summary.unitsTotal },
-        todayStatuses: this.data.units.flatMap((u) => this.computeUnit(u.id, event).statuses),
+        todayStatuses: this.data.units.flatMap((u) => this.reportedFor(u.id, event)),
         serverNow: this.nowIso(),
       });
     });
@@ -542,8 +536,7 @@ export class MockApi implements ApiClient {
       const event = this.eventById(eventId);
       const groups = ABSENCE_STATUSES.map((status) => ({ status, items: [] as AbsenteesDto['groups'][number]['items'] }));
       for (const unit of this.data.units) {
-        const { statuses } = this.computeUnit(unit.id, event);
-        for (const s of statuses) {
+        for (const s of this.reportedFor(unit.id, event)) {
           if (s.status === 'PRESENT' || s.status === 'UNMARKED') continue;
           groups.find((g) => g.status === s.status)!.items.push({ personId: s.personId, rank: s.rank, name: s.name, unitId: unit.id, unitName: unit.name, status: s.status, subType: s.subType, halfDay: s.halfDay, startDate: s.startDate, endDate: s.endDate, remark: s.remark });
         }

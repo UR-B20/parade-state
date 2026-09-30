@@ -23,7 +23,7 @@ eventRoutes.post('/', requireAdmin, body(CreateAdhocEventSchema), async (c) => {
   const db = c.get('db');
   const input = c.req.valid('json');
   await getSettings(db);
-  return c.json(await createAdhocEvent(db, input, c.get('user').id, c.get('realNow')), 201);
+  return c.json(await createAdhocEvent(db, input, c.get('user').id), 201);
 });
 
 eventRoutes.get('/archived', requireAdmin, async (c) => c.json(await listArchivedEvents(c.get('db'))));

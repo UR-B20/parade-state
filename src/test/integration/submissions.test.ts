@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHarness, type Harness } from './harness';
 import { runScheduled } from '../../worker/scheduled';
-import type { NotificationsDto, PersonDto, SubmissionDto, UnitAttendanceDto } from '@shared/types';
+import type { AbsenteesDto, BattalionSummaryDto, NotificationsDto, PersonDto, SubmissionDto, UnitAttendanceDto } from '@shared/types';
 
 let h: Harness;
 let admin: string;
@@ -84,19 +84,50 @@ describe('submissions', () => {
     expect((await attendance()).body.submission).toMatchObject({ hasChanges: false });
   });
 
-  it('an ad hoc event is pre-filled from the last submitted parade state', async () => {
-    // Coy 1 last submitted v2: Daniel Present (Back to Present), Amir Present. Give Daniel a new MC afterwards.
+  it('an ad hoc event starts unmarked, and S1 sees a unit\'s figures only once it submits', async () => {
+    // Coy 1 last submitted v2 (Daniel and Amir Present). Give Daniel a new MC afterwards.
     await h.json(`/units/COY1/attendance/${AM}/persons/${daniel}`, { method: 'PUT', as: cdr1, json: { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-09' } });
     const created = await h.json<{ id: string }>('/events', { method: 'POST', as: admin, json: { date: '2026-09-06', name: 'Route march', cutoffTime: '16:00' } });
     expect(created.status).toBe(201);
-    const view = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${created.body.id}`, { as: cdr1 });
-    const byName = Object.fromEntries(view.body.persons.map((p) => [p.name, p.status]));
-    // Amir was submitted Present -> pre-filled Present. Daniel's new MC covers the day, so the span wins.
-    expect(byName).toEqual({ 'Amir Rahman': 'PRESENT', 'Daniel Tan': 'MC' });
+    const id = created.body.id;
+    // Commander: nothing copied from the AM parade; only the MC span applies.
+    const view = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${id}`, { as: cdr1 });
+    expect(Object.fromEntries(view.body.persons.map((p) => [p.name, p.status]))).toEqual({ 'Amir Rahman': 'UNMARKED', 'Daniel Tan': 'MC' });
     expect(view.body.submission.kind).toBe('NOT_MARKED');
-    // Coy 2 never submitted, so nothing is pre-filled there.
-    const coy2 = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${created.body.id}`, { as: cdr2 });
+    // S1: before any submission the whole unit counts as Not yet marked, absentees included.
+    const before = await h.json<BattalionSummaryDto>(`/admin/summary/${id}`, { as: admin });
+    const coy1Before = before.body.units.find((u) => u.unit.id === 'COY1')!;
+    expect(coy1Before.counts).toMatchObject({ strength: 2, present: 0, absent: 0, unmarked: 2 });
+    expect(coy1Before.submission.kind).toBe('NOT_MARKED');
+    expect((await h.json<AbsenteesDto>(`/admin/absentees/${id}`, { as: admin })).body.total).toBe(0);
+    // The commander marks Amir Present: still nothing for S1 until submission.
+    const amir = view.body.persons.find((p) => p.name === 'Amir Rahman')!.personId;
+    await h.json(`/units/COY1/attendance/${id}/persons/${amir}`, { method: 'PUT', as: cdr1, json: { action: 'PRESENT' } });
+    const marked = await h.json<BattalionSummaryDto>(`/admin/summary/${id}`, { as: admin });
+    const coy1Marked = marked.body.units.find((u) => u.unit.id === 'COY1')!;
+    expect(coy1Marked.counts).toMatchObject({ present: 0, unmarked: 2 });
+    expect(coy1Marked.submission.kind).toBe('PENDING');
+    // Submit: S1 now sees the submitted figures.
+    expect((await h.request(`/units/COY1/submissions/${id}`, { method: 'POST', as: cdr1 })).status).toBe(201);
+    const after = await h.json<BattalionSummaryDto>(`/admin/summary/${id}`, { as: admin });
+    const coy1After = after.body.units.find((u) => u.unit.id === 'COY1')!;
+    expect(coy1After.counts).toMatchObject({ present: 1, mc: 1, absent: 1, unmarked: 0 });
+    expect(coy1After.submission).toMatchObject({ kind: 'SUBMITTED', hasChanges: false });
+    expect((await h.json<AbsenteesDto>(`/admin/absentees/${id}`, { as: admin })).body.groups.map((g) => [g.status, g.items.map((i) => i.name)])).toEqual([['MC', ['Daniel Tan']]]);
+    // A change after submission keeps the submitted figures on the dashboard, flagged as changed.
+    await h.json(`/units/COY1/attendance/${id}/persons/${daniel}`, { method: 'PUT', as: cdr1, json: { action: 'BACK_TO_PRESENT' } });
+    const changed = await h.json<BattalionSummaryDto>(`/admin/summary/${id}`, { as: admin });
+    const coy1Changed = changed.body.units.find((u) => u.unit.id === 'COY1')!;
+    expect(coy1Changed.counts).toMatchObject({ present: 1, mc: 1 });
+    expect(coy1Changed.submission).toMatchObject({ kind: 'SUBMITTED', hasChanges: true });
+    // The AM parade stays live for S1: the MC ending shows there at once (Daniel's AM mark went with the MC, so he is unmarked).
+    const am = await h.json<BattalionSummaryDto>(`/admin/summary/${AM}`, { as: admin });
+    expect(am.body.units.find((u) => u.unit.id === 'COY1')!.counts).toMatchObject({ present: 1, mc: 0, unmarked: 1 });
+    // Coy 2 never submitted, so nothing to show there either.
+    const coy2 = await h.json<UnitAttendanceDto>(`/units/COY2/attendance/${id}`, { as: cdr2 });
     expect(coy2.body.counts).toMatchObject({ unmarked: 1, present: 0 });
+    // Put Daniel's MC back for the tests that follow.
+    await h.json(`/units/COY1/attendance/${AM}/persons/${daniel}`, { method: 'PUT', as: cdr1, json: { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-09' } });
   });
 
   it('the Roll Call is pre-filled from the last submitted parade on first open and is never Late', async () => {
@@ -118,14 +149,14 @@ describe('submissions', () => {
 
   it('marks and reads notifications', async () => {
     const before = await notifs();
-    expect(before.body.unreadCount).toBe(2);
+    expect(before.body.unreadCount).toBe(3); // AM v1, AM v2 and the ad hoc submission
     await h.json('/notifications/read', { method: 'POST', as: admin, json: { ids: [before.body.items[0]!.id] } });
-    expect((await notifs()).body.unreadCount).toBe(1);
+    expect((await notifs()).body.unreadCount).toBe(2);
     await h.json('/notifications/read', { method: 'POST', as: admin, json: { all: true } });
     expect((await notifs()).body.unreadCount).toBe(0);
     expect((await h.json<NotificationsDto>('/notifications?unreadOnly=1', { as: admin })).body.items).toHaveLength(0);
     // The other admin's notifications are untouched.
-    expect((await notifs(admin2)).body.unreadCount).toBe(2);
+    expect((await notifs(admin2)).body.unreadCount).toBe(3);
   });
 });
 

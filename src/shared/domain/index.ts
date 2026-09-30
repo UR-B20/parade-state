@@ -7,3 +7,4 @@ export * from './dateLock';
 export * from './markOps';
 export * from './trends';
 export * from './insights';
+export * from './reported';

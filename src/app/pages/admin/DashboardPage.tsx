@@ -178,6 +178,7 @@ export function DashboardPage() {
                 note={
                   <span className="num">
                     {summary.totals.absent} absent · {summary.totals.unmarked} not yet marked
+                    {event?.type === 'ADHOC' ? ' · figures as submitted; a Branch/Coy shows once it submits' : ''}
                   </span>
                 }
               />

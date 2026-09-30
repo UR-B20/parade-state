@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { awaitingRank, contentHash, deriveSubmissionState, effectiveStatuses, eventHalf, platoonBreakdown, sumCounts, unitCounts } from '@shared/domain';
+import { awaitingRank, contentHash, deriveSubmissionState, effectiveStatuses, eventHalf, platoonBreakdown, reportedStatuses, sumCounts, unitCounts } from '@shared/domain';
 import type { AbsenteeDto, AbsenteesDto, BattalionSummaryDto, EffectiveStatus, UnitSummaryRow } from '@shared/types';
 import { ABSENCE_STATUSES } from '@shared/statuses';
 import type { Db } from '../db/client';
@@ -14,7 +14,9 @@ import { resolveNow } from './settings';
 /**
  * Every unit's rows for one event, loaded battalion-wide in five queries rather than five per
  * unit: the Worker sits one network round trip away from Postgres for each query, so the
- * dashboard cost is the query count, not the row count.
+ * dashboard cost is the query count, not the row count. The submission state always follows
+ * the live marks; the figures and statuses follow `reportedStatuses` (live for parades and
+ * the Roll Call, submitted only for ad hoc events).
  */
 export async function unitRows(db: Db, event: EventRow, now: Date): Promise<{ row: UnitSummaryRow; statuses: EffectiveStatus[] }[]> {
   const units = await listUnits(db);
@@ -23,7 +25,7 @@ export async function unitRows(db: Db, event: EventRow, now: Date): Promise<{ ro
     db.select().from(personnel).where(inArray(personnel.unitId, unitIds)),
     db.select().from(statusSpans).where(and(inArray(statusSpans.unitId, unitIds), isNull(statusSpans.supersededAt))),
     db.select({ personId: eventMarks.personId, unitId: eventMarks.unitId }).from(eventMarks).where(eq(eventMarks.eventId, event.id)),
-    db.select({ unitId: submissions.unitId, version: submissions.version, submittedAt: submissions.submittedAt, submittedBy: submissions.submittedBy, contentHash: submissions.contentHash }).from(submissions).where(eq(submissions.eventId, event.id)),
+    db.select({ unitId: submissions.unitId, version: submissions.version, submittedAt: submissions.submittedAt, submittedBy: submissions.submittedBy, contentHash: submissions.contentHash, snapshot: submissions.snapshot }).from(submissions).where(eq(submissions.eventId, event.id)),
     db.select().from(unitEventState).where(eq(unitEventState.eventId, event.id)),
   ]);
   const latestByUnit = new Map<string, (typeof subs)[number]>();
@@ -49,8 +51,9 @@ export async function unitRows(db: Db, event: EventRow, now: Date): Promise<{ ro
         now,
         currentHash: hash,
       });
-      const row: UnitSummaryRow = { unit: u, counts: unitCounts(statuses), submission: state, platoons: platoonBreakdown(statuses, u.platoons) };
-      return { row, statuses };
+      const reported = reportedStatuses(event, statuses, latest?.snapshot ?? null);
+      const row: UnitSummaryRow = { unit: u, counts: unitCounts(reported), submission: state, platoons: platoonBreakdown(reported, u.platoons) };
+      return { row, statuses: reported };
     }),
   );
 }

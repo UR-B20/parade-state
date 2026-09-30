@@ -5,7 +5,6 @@ import type { Db } from '../db/client';
 import { events, type EventRow, type ProfileRow } from '../db/schema';
 import { notFound, validation } from '../errors';
 import type { Settings } from './settings';
-import { prefillFromLastSubmission } from './prefill';
 
 export const EVENT_TYPE_ORDER = { AM: 0, PM: 1, ROLLCALL: 2, ADHOC: 3 } as const;
 
@@ -64,13 +63,13 @@ export async function getEvent(db: Db, id: string, settings: Settings): Promise<
   return row;
 }
 
-export async function createAdhocEvent(db: Db, input: { date: IsoDate; name: string; cutoffTime: string }, createdBy: string, realNow: Date): Promise<EventDto> {
+/** Ad hoc events start unmarked for every unit, like the AM and PM parades. */
+export async function createAdhocEvent(db: Db, input: { date: IsoDate; name: string; cutoffTime: string }, createdBy: string): Promise<EventDto> {
   const id = `${input.date}-X-${crypto.randomUUID().slice(0, 8)}`;
   const [row] = await db
     .insert(events)
     .values({ id, date: input.date, type: 'ADHOC', name: input.name, cutoffAt: sgLocalToInstant(input.date, input.cutoffTime), createdBy })
     .returning();
-  await prefillFromLastSubmission(db, row!, createdBy, realNow);
   return toEventDto(row!);
 }
 
