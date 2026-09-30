@@ -31,9 +31,11 @@ submissions across the battalion, sees who is absent and why, and exports to Exc
   show as "changes since submission" until the unit **resubmits**.
 - S1 exports one event (Excel summary plus absentees, or CSV) or a **whole month** as one
   workbook: the battalion by day, each Branch/Coy by day and every absentee, as submitted.
-- **Ad hoc events** created by S1 start unmarked like the AM and PM parades. On the S1
-  dashboard an ad hoc event shows a Branch/Coy's figures only once that Branch/Coy has
-  submitted; until then its personnel count as Not yet marked. Parades and the Roll Call stay
+- **Ad hoc events** created by S1 start, for each Branch/Coy, from the parade that
+  Branch/Coy submitted earlier the same day (the PM parade if submitted, else the AM parade);
+  with nothing submitted that day they start unmarked. On the S1 dashboard an ad hoc event
+  shows a Branch/Coy's figures only once that Branch/Coy has submitted; until then its
+  personnel count as Not yet marked. Parades and the Roll Call stay
   live for S1. Once an ad hoc event is over, S1 can **archive** it from the dashboard: it
   disappears from every event picker but keeps its submissions, and can be restored under
   Cut-offs and unlocks.

@@ -84,10 +84,11 @@ integration tests, Playwright for e2e. Deploy via Cloudflare Workers Builds
   on events in that half (`deleteMarksHalf`). The content hash appends `|AM`/`|PM` only when
   set, so old submissions keep their hashes.
 - Events per date: AM parade, PM parade, Roll Call (`YYYY-MM-DD-RC`, type ROLLCALL, no cut-off,
-  never Late, optional, excluded from timeliness) and any ad hoc events. AM, PM and ad hoc
-  events start unmarked (ad hoc pre-fill was removed on 30 Sep at the owner's request). The
-  Roll Call is pre-filled per unit the first time it is opened (`prefillRollCallForUnit`:
-  PM parade if submitted, else AM, else the last parade before that day). S1's dashboard is
+  never Late, optional, excluded from timeliness) and any ad hoc events. AM and PM start
+  unmarked. The Roll Call and ad hoc events are pre-filled per unit the first time a
+  commander opens them (`prefillUnitFromParade`: the PM parade if submitted, else AM; the
+  Roll Call may reach back to earlier days, an ad hoc event takes only a parade submitted on
+  its own date and otherwise starts unmarked). Creation copies nothing. S1's dashboard is
   live for parades and the Roll Call but, for ad hoc events, shows a unit's figures only from
   its latest submission (`reportedStatuses` in `src/shared/domain/reported.ts`, applied in
   `unitRows` and the mock): unsubmitted units count as all UNMARKED, later changes keep the

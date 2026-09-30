@@ -112,16 +112,16 @@ export class MockApi implements ApiClient {
     return new Set(this.data.personnel.filter((p) => p.unitId === unitId && p.postedInDate <= event.date && (p.postedOutDate === null || p.postedOutDate > event.date) && !covered.has(p.id)).map((p) => p.id));
   }
 
-  /** The Roll Call starts from the unit's last submitted parade the first time anyone opens it. */
-  private prefillRollCall(unitId: UnitId, event: EventDto, userId: string) {
-    if (event.type !== 'ROLLCALL') return;
+  /** The Roll Call (any earlier day) or an ad hoc event (same day only) starts from the unit's submitted parade the first time anyone opens it. */
+  private prefillFromParade(unitId: UnitId, event: EventDto, userId: string) {
+    if (event.type !== 'ROLLCALL' && event.type !== 'ADHOC') return;
     if (this.data.marks.some((m) => m.unitId === unitId && m.eventId === event.id)) return;
     if (this.data.submissions.some((s) => s.unitId === unitId && s.eventId === event.id)) return;
     if (this.data.unitEventState.some((s) => s.unitId === unitId && s.eventId === event.id)) return;
     const order = { PM: 1, AM: 0 } as Record<string, number>;
     const latest = this.data.submissions
       .map((s) => ({ s, ev: this.eventById(s.eventId) }))
-      .filter(({ s, ev }) => s.unitId === unitId && (ev.type === 'AM' || ev.type === 'PM') && ev.date <= event.date && s.submittedAt <= this.nowIso())
+      .filter(({ s, ev }) => s.unitId === unitId && (ev.type === 'AM' || ev.type === 'PM') && (event.type === 'ADHOC' ? ev.date === event.date : ev.date <= event.date) && s.submittedAt <= this.nowIso())
       .sort((a, b) => (a.ev.date !== b.ev.date ? (a.ev.date < b.ev.date ? 1 : -1) : (order[b.ev.type] ?? 0) - (order[a.ev.type] ?? 0) || b.s.version - a.s.version))[0]?.s;
     if (!latest) return;
     const active = this.prefillCandidates(unitId, event);
@@ -335,7 +335,7 @@ export class MockApi implements ApiClient {
       const unit = this.unit(unitId);
       const event = this.eventById(eventId);
       const user = this.currentUser();
-      this.prefillRollCall(unit.id, event, user.id);
+      this.prefillFromParade(unit.id, event, user.id);
       const { statuses, counts } = this.computeUnit(unitId, event);
       const hash = await contentHash(statuses);
       const sub = await this.submissionFor(unitId, event, hash);

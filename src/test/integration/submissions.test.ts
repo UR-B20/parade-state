@@ -84,23 +84,27 @@ describe('submissions', () => {
     expect((await attendance()).body.submission).toMatchObject({ hasChanges: false });
   });
 
-  it('an ad hoc event starts unmarked, and S1 sees a unit\'s figures only once it submits', async () => {
+  it('an ad hoc event starts from the same day\'s submitted parade, and S1 sees a unit\'s figures only once it submits', async () => {
     // Coy 1 last submitted v2 (Daniel and Amir Present). Give Daniel a new MC afterwards.
     await h.json(`/units/COY1/attendance/${AM}/persons/${daniel}`, { method: 'PUT', as: cdr1, json: { action: 'SET', status: 'MC', startDate: '2026-09-06', endDate: '2026-09-09' } });
     const created = await h.json<{ id: string }>('/events', { method: 'POST', as: admin, json: { date: '2026-09-06', name: 'Route march', cutoffTime: '16:00' } });
     expect(created.status).toBe(201);
     const id = created.body.id;
-    // Commander: nothing copied from the AM parade; only the MC span applies.
+    // Commander: starts from today's submitted AM parade (Amir Present); Daniel's newer MC span wins over the copied mark.
     const view = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${id}`, { as: cdr1 });
-    expect(Object.fromEntries(view.body.persons.map((p) => [p.name, p.status]))).toEqual({ 'Amir Rahman': 'UNMARKED', 'Daniel Tan': 'MC' });
+    expect(Object.fromEntries(view.body.persons.map((p) => [p.name, p.status]))).toEqual({ 'Amir Rahman': 'PRESENT', 'Daniel Tan': 'MC' });
     expect(view.body.submission.kind).toBe('NOT_MARKED');
+    // An ad hoc event on a day with no submitted parade starts unmarked.
+    const other = await h.json<{ id: string }>('/events', { method: 'POST', as: admin, json: { date: '2026-09-07', name: 'Range', cutoffTime: '16:00' } });
+    const otherView = await h.json<UnitAttendanceDto>(`/units/COY1/attendance/${other.body.id}`, { as: cdr1 });
+    expect(Object.fromEntries(otherView.body.persons.map((p) => [p.name, p.status]))).toEqual({ 'Amir Rahman': 'UNMARKED', 'Daniel Tan': 'MC' });
     // S1: before any submission the whole unit counts as Not yet marked, absentees included.
     const before = await h.json<BattalionSummaryDto>(`/admin/summary/${id}`, { as: admin });
     const coy1Before = before.body.units.find((u) => u.unit.id === 'COY1')!;
     expect(coy1Before.counts).toMatchObject({ strength: 2, present: 0, absent: 0, unmarked: 2 });
     expect(coy1Before.submission.kind).toBe('NOT_MARKED');
     expect((await h.json<AbsenteesDto>(`/admin/absentees/${id}`, { as: admin })).body.total).toBe(0);
-    // The commander marks Amir Present: still nothing for S1 until submission.
+    // The commander confirms Amir Present: still nothing for S1 until submission.
     const amir = view.body.persons.find((p) => p.name === 'Amir Rahman')!.personId;
     await h.json(`/units/COY1/attendance/${id}/persons/${amir}`, { method: 'PUT', as: cdr1, json: { action: 'PRESENT' } });
     const marked = await h.json<BattalionSummaryDto>(`/admin/summary/${id}`, { as: admin });

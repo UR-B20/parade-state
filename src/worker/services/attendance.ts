@@ -14,7 +14,7 @@ import { toEventDto } from './events';
 import { activePersonnelOn } from './roll';
 import { isLockedForCommander, resolveNow } from './settings';
 import { getUnitWithPlatoons } from './platoons';
-import { prefillRollCallForUnit } from './prefill';
+import { prefillUnitFromParade } from './prefill';
 
 export async function getUnit(db: Db, unitId: string): Promise<UnitDto> {
   return getUnitWithPlatoons(db, unitId);
@@ -78,9 +78,10 @@ export async function loadUnitState(db: Db, env: Bindings, unitId: string, event
   const [unit, { now }] = await Promise.all([getUnit(db, unitId), resolveNow(db, env, realNow)]);
   let { statuses, counts, hash, markCount } = await computeUnit(db, unitId, event);
   let sub = await submissionStateFor(db, unitId, event, hash, now, statuses);
-  // A Roll Call nobody has touched yet starts from the unit's last submitted parade.
-  if (event.type === 'ROLLCALL' && markCount === 0 && sub.state.kind === 'NOT_MARKED') {
-    const copied = await prefillRollCallForUnit(db, unitId, event, user.id, realNow);
+  // A Roll Call or ad hoc event nobody has touched yet starts from the unit's submitted parade
+  // (any earlier day for the Roll Call, the same day only for an ad hoc event).
+  if ((event.type === 'ROLLCALL' || event.type === 'ADHOC') && markCount === 0 && sub.state.kind === 'NOT_MARKED') {
+    const copied = await prefillUnitFromParade(db, unitId, event, user.id, realNow);
     if (copied > 0) {
       ({ statuses, counts, hash } = await computeUnit(db, unitId, event));
       sub = await submissionStateFor(db, unitId, event, hash, now, statuses);
